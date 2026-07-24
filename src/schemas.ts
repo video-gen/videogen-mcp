@@ -9,7 +9,10 @@ import { z } from "zod";
  * (which MCP requires), so we keep a loose object/array schema for the wire
  * format. The API still validates these fields.
  */
-export function sdkFieldSchema<T>(runtimeSchema: z.ZodTypeAny, description: string): z.ZodType<T> {
+export function sdkFieldSchema<T>(
+  runtimeSchema: z.ZodTypeAny,
+  description: string,
+): z.ZodType<T> {
   // We intentionally use an unsafe `as` assertion here because the loose runtime
   // schema exists only to produce a JSON Schema for MCP; the actual field is
   // validated by the API, and its true type is the SDK's `T`.
@@ -37,7 +40,9 @@ export const pollControlShape = {
     .int()
     .positive()
     .optional()
-    .describe("Maximum time to wait for a terminal state before giving up, in milliseconds."),
+    .describe(
+      "Maximum time to wait for a terminal state before giving up, in milliseconds.",
+    ),
 };
 
 export const cursorField = z
@@ -62,10 +67,18 @@ export const selfOnlyField = z
 
 export const aspectRatioSchema = z
   .object({
-    width: z.number().positive().describe("Aspect-ratio width (e.g. 16 for 16:9)."),
-    height: z.number().positive().describe("Aspect-ratio height (e.g. 9 for 16:9)."),
+    width: z
+      .number()
+      .positive()
+      .describe("Aspect-ratio width (e.g. 16 for 16:9)."),
+    height: z
+      .number()
+      .positive()
+      .describe("Aspect-ratio height (e.g. 9 for 16:9)."),
   })
-  .describe("Output aspect ratio as a width:height pair (e.g. { width: 16, height: 9 }).");
+  .describe(
+    "Output aspect ratio as a width:height pair (e.g. { width: 16, height: 9 }).",
+  );
 
 export const visualStyleSchema = z
   .object({
@@ -83,21 +96,27 @@ export const visualStyleSchema = z
     entityId: z
       .string()
       .optional()
-      .describe("Required when type is ENTITY: id of a VISUAL_STYLE entity (vg_enti_...)."),
+      .describe(
+        "Required when type is ENTITY: id of a VISUAL_STYLE entity (vg_enti_...).",
+      ),
     restyleFeaturedBRollWithAiStyle: z
       .boolean()
       .optional()
-      .describe("When true (AI_IMAGE only), re-render featured b-roll images in the chosen style."),
+      .describe(
+        "When true (AI_IMAGE only), re-render featured b-roll images in the chosen style.",
+      ),
   })
-  .describe("Visual treatment for the generated b-roll.");
+  .describe("Visual style for the generated b-roll.");
 
 export const visualPacingSchema = z
   .enum(["FAST", "MEDIUM", "SLOW"])
   .describe("How quickly visuals change. Defaults to MEDIUM.");
 
 export const imageQualitySchema = z
-  .enum(["LOW", "STANDARD", "HIGH"])
-  .describe("AI image generation quality tier. LOW is fastest/cheapest; HIGH is highest quality.");
+  .enum(["LOW", "STANDARD", "HIGH", "MAX"])
+  .describe(
+    "AI image generation quality tier. LOW is fastest/cheapest; MAX is highest quality. Optional; when omitted, your workspace's Default AI quality is used.",
+  );
 
 export const watermarkModeSchema = z
   .enum(["NONE", "VIDEO_GEN", "AUTO"])

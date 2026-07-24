@@ -35,9 +35,9 @@ const videoFileIdsField = z
   .optional()
   .describe("Source video file ids (vg_file_...) for video-conditioned generation.");
 
-const imageStorageFileIdField = z.string().describe("Source image file id (vg_file_...).");
+const imageFileIdField = z.string().describe("Source image file id (vg_file_...).");
 
-const videoStorageFileIdField = z.string().describe("Source video file id (vg_file_...).");
+const videoFileIdField = z.string().describe("Source video file id (vg_file_...).");
 
 const pollToTerminal = (getClient: GetVideoGenClient) => ({
   poll: (toolExecutionId: string) => getClient().tools.getToolExecutionInfo({ toolExecutionId }),
@@ -57,7 +57,7 @@ export function registerMediaToolTools(
         "Generate an image from a text prompt, optionally conditioned on source images (image-to-image).",
       inputSchema: {
         prompt: z.string().describe("Text description of the image to generate."),
-        quality: imageQualitySchema,
+        quality: imageQualitySchema.optional(),
         imageFileIds: imageFileIdsField,
         aspectRatio: aspectRatioSchema.optional(),
         watermarkMode: watermarkModeSchema.optional(),
@@ -81,9 +81,14 @@ export function registerMediaToolTools(
     {
       title: "Generate video clip",
       description:
-        "Generate a video clip from a text prompt, source images, or source videos. quality must be STANDARD or HIGH.",
+        "Generate a video clip from a text prompt, source images, or source videos. quality is optional (STANDARD, HIGH, or MAX; LOW is not supported).",
       inputSchema: {
-        quality: z.enum(["STANDARD", "HIGH"]).describe("Video generation quality tier."),
+        quality: z
+          .enum(["STANDARD", "HIGH", "MAX"])
+          .optional()
+          .describe(
+            "Video generation quality tier (STANDARD, HIGH, or MAX). Optional; when omitted, your workspace's Default AI quality for video is used.",
+          ),
         prompt: z.string().optional().describe("Text description of the video to generate."),
         imageFileIds: imageFileIdsField,
         videoFileIds: videoFileIdsField,
@@ -252,7 +257,7 @@ export function registerMediaToolTools(
         avatarPresenterId: z
           .string()
           .describe("Presenter id from list_avatar_presenters (vg_pres_...)."),
-        audioStorageFileId: z
+        audioFileId: z
           .string()
           .describe("Uploaded audio file id (vg_file_...) for the avatar to lip-sync."),
         watermarkMode: watermarkModeSchema.optional(),
@@ -277,7 +282,7 @@ export function registerMediaToolTools(
       title: "Vectorize image",
       description: "Convert a raster image into a vector (SVG).",
       inputSchema: {
-        imageStorageFileId: imageStorageFileIdField,
+        imageFileId: imageFileIdField,
         watermarkMode: watermarkModeSchema.optional(),
         numResults: numResultsField,
         isOutputTemporary: isOutputTemporaryField,
@@ -300,7 +305,7 @@ export function registerMediaToolTools(
       title: "Remove image background",
       description: "Remove the background from an image.",
       inputSchema: {
-        imageStorageFileId: imageStorageFileIdField,
+        imageFileId: imageFileIdField,
         watermarkMode: watermarkModeSchema.optional(),
         numResults: numResultsField,
         isOutputTemporary: isOutputTemporaryField,
@@ -323,7 +328,7 @@ export function registerMediaToolTools(
       title: "Remove video background",
       description: "Remove the background from a video.",
       inputSchema: {
-        videoStorageFileId: videoStorageFileIdField,
+        videoFileId: videoFileIdField,
         watermarkMode: watermarkModeSchema.optional(),
         numResults: numResultsField,
         isOutputTemporary: isOutputTemporaryField,
@@ -346,7 +351,7 @@ export function registerMediaToolTools(
       title: "Upscale image",
       description: "Increase the resolution of an image.",
       inputSchema: {
-        imageStorageFileId: imageStorageFileIdField,
+        imageFileId: imageFileIdField,
         watermarkMode: watermarkModeSchema.optional(),
         numResults: numResultsField,
         isOutputTemporary: isOutputTemporaryField,
@@ -369,7 +374,7 @@ export function registerMediaToolTools(
       title: "Upscale video",
       description: "Increase the resolution of a video.",
       inputSchema: {
-        videoStorageFileId: videoStorageFileIdField,
+        videoFileId: videoFileIdField,
         watermarkMode: watermarkModeSchema.optional(),
         numResults: numResultsField,
         isOutputTemporary: isOutputTemporaryField,
@@ -392,7 +397,7 @@ export function registerMediaToolTools(
       title: "Image 3D effect",
       description: "Add 3D parallax motion to a still image, producing a video.",
       inputSchema: {
-        imageStorageFileId: imageStorageFileIdField,
+        imageFileId: imageFileIdField,
         watermarkMode: watermarkModeSchema.optional(),
         numResults: numResultsField,
         isOutputTemporary: isOutputTemporaryField,
