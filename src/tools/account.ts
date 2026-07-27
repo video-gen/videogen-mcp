@@ -12,7 +12,7 @@ export function registerAccountTools(
     {
       title: "Get account",
       description:
-        "Fetch the authenticated team's account details, including the current credit balance.",
+        "Fetch the account and team behind the API key (`apiKeyId`, `apiKeyNickname`, `email`, `displayName`, `teamId`). Use it as a connection test.",
       inputSchema: {},
     },
     async () => await respondSdk(() => getClient().account.getMe()),

@@ -26,6 +26,10 @@ export const OAUTH_SCOPES = ["email", "profile"] as const;
  * `401`s — to show a tool's OAuth linking UI. Applied only when the server
  * authenticates with OAuth; API-key servers advertise no scheme.
  *
+ * Tools that set `_meta.securitySchemes` themselves (e.g. `open_uploader`'s
+ * `{ type: "noauth" }`) keep that declaration — the patch only fills in the
+ * default `oauth2` scheme when none was provided.
+ *
  * `_meta` is where we CAN set it: the SDK's `tools/list` serializer emits `_meta`
  * verbatim but drops any unknown top-level field, so we cannot put
  * `securitySchemes` at the tool's top level here. The hosted HTTP transport
@@ -38,7 +42,10 @@ function advertiseOAuthSecuritySchemes(server: McpServer, scopes: readonly strin
   const originalRegisterTool = server.registerTool.bind(server);
 
   server.registerTool = (name, config, cb) => {
-    config._meta = { ...config._meta, securitySchemes };
+    // Preserve an explicit per-tool scheme (e.g. open_uploader → noauth).
+    if (config._meta?.securitySchemes == null) {
+      config._meta = { ...config._meta, securitySchemes };
+    }
 
     return originalRegisterTool(name, config, cb);
   };

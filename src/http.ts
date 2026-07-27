@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { isJSONRPCResponse } from "@modelcontextprotocol/sdk/types.js";
 import type { VideoGen } from "@videogen/sdk";
 import { applyServerProxyKeepAliveTimeouts } from "./applyServerProxyKeepAliveTimeouts";
 import { OAUTH_SCOPES, SERVER_NAME, SERVER_VERSION, buildMcpServer } from "./buildServer";
@@ -11,17 +12,21 @@ import {
   readHttpServerConfig,
   type VideogenEnvironment,
 } from "./env";
+import {
+  getHasToolAuthChallenge,
+  getMcpMethodFromBody,
+  getToolNamesFromListResult,
+  logMcpRequest,
+} from "./mcpRequestLog";
 import type { McpOAuthContext } from "./operations";
+import {
+  MCP_PATH,
+  OAUTH_PROTECTED_RESOURCE_MCP_PATH,
+  OAUTH_PROTECTED_RESOURCE_PATH,
+  buildProtectedResourceMetadata,
+  buildWwwAuthenticateChallenge,
+} from "./oauthProtectedResource";
 import { mirrorSecuritySchemesToTopLevel } from "./securitySchemes";
-
-const MCP_PATH = "/mcp";
-const OAUTH_PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
-
-// RFC 9728 §3.1 path-aware discovery: because our resource identifier ends in
-// `/mcp`, a spec-compliant client derives the metadata URL by inserting the
-// resource path AFTER the well-known segment. We serve this alongside the root
-// well-known URL so both discovery styles resolve to the same metadata.
-const OAUTH_PROTECTED_RESOURCE_MCP_PATH = `${OAUTH_PROTECTED_RESOURCE_PATH}${MCP_PATH}`;
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const BODY_READ_TIMEOUT_MS = 30 * 1000;
@@ -107,27 +112,6 @@ function firstHeaderValue(value: string | string[] | undefined): string | null {
   return raw != null && raw.trim() !== "" ? raw.split(",")[0]?.trim() ?? null : null;
 }
 
-/**
- * Builds the OAuth 2.0 Protected Resource Metadata (RFC 9728) that MCP clients
- * fetch to discover which authorization server issues tokens for this resource.
- * Returns null when no OAuth issuer is configured (API-key-only mode).
- */
-function buildProtectedResourceMetadata(req: IncomingMessage): Record<string, unknown> | null {
-  if (config.oauthIssuer == null) {
-    return null;
-  }
-
-  const origin = getRequestOrigin(req);
-
-  return {
-    resource: `${origin}${MCP_PATH}`,
-    authorization_servers: [config.oauthIssuer],
-    scopes_supported: [...OAUTH_SCOPES],
-    bearer_methods_supported: ["header"],
-    resource_documentation: "https://docs.videogen.io/libraries/mcp",
-  };
-}
-
 function extractBearerToken(req: IncomingMessage): string | null {
   const header = req.headers.authorization;
 
@@ -203,22 +187,6 @@ function readJsonBody(req: IncomingMessage): Promise<ReadBodyResult> {
   });
 }
 
-/**
- * Builds the `WWW-Authenticate` challenge for an unauthenticated request. When
- * an OAuth issuer is configured, it points clients at this resource's protected
- * resource metadata (per the MCP authorization spec) so they can bootstrap the
- * OAuth flow; otherwise it falls back to a plain Bearer realm.
- */
-function buildWwwAuthenticateChallenge(req: IncomingMessage): string {
-  if (config.oauthIssuer == null) {
-    return 'Bearer realm="VideoGen MCP"';
-  }
-
-  const resourceMetadataUrl = `${getRequestOrigin(req)}${OAUTH_PROTECTED_RESOURCE_PATH}`;
-
-  return `Bearer realm="VideoGen MCP", resource_metadata="${resourceMetadataUrl}"`;
-}
-
 async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const bodyResult = await readJsonBody(req);
 
@@ -233,6 +201,8 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   const token = extractBearerToken(req);
+  const mcpMethod = getMcpMethodFromBody(bodyResult.body);
+  const hasAuthorization = token != null;
 
   // In OAuth mode (an issuer is configured) we DON'T reject unauthenticated
   // requests at the transport. Discovery (`initialize` / `tools/list`) must be
@@ -246,13 +216,25 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
   // In API-key-only mode (no issuer) there is no OAuth flow to run, so we keep
   // the transport-level `WWW-Authenticate` challenge for a missing token.
   if (token == null && config.oauthIssuer == null) {
-    res.setHeader("WWW-Authenticate", buildWwwAuthenticateChallenge(req));
+    res.setHeader(
+      "WWW-Authenticate",
+      buildWwwAuthenticateChallenge({
+        origin: getRequestOrigin(req),
+        oauthIssuer: config.oauthIssuer,
+      }),
+    );
     writeJsonRpcError(
       res,
       401,
       -32001,
       "Missing VideoGen credentials. Send an API key (create one at https://app.videogen.io/developers) or an OAuth access token as an 'Authorization: Bearer <token>' header.",
     );
+    logMcpRequest({
+      method: mcpMethod,
+      httpStatus: 401,
+      hasAuthorization,
+      authChallengeEmitted: true,
+    });
 
     return;
   }
@@ -313,10 +295,28 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
 
   // Patch outbound messages so the `tools/list` response carries top-level
   // `securitySchemes` (which the SDK's serializer omits). See
-  // `mirrorSecuritySchemesToTopLevel`.
+  // `mirrorSecuritySchemesToTopLevel`. Also capture tool names for discovery
+  // logs without logging result bodies or secrets.
+  let listedToolNames: string[] | null = null;
+  let toolAuthChallengeEmitted = false;
   const originalSend = transport.send.bind(transport);
-  transport.send = (message, options) =>
-    originalSend(mirrorSecuritySchemesToTopLevel(message), options);
+  transport.send = (message, options) => {
+    const mirrored = mirrorSecuritySchemesToTopLevel(message);
+
+    if (isJSONRPCResponse(mirrored)) {
+      const toolNames = getToolNamesFromListResult(mirrored.result);
+
+      if (toolNames != null) {
+        listedToolNames = toolNames;
+      }
+
+      if (getHasToolAuthChallenge(mirrored.result)) {
+        toolAuthChallengeEmitted = true;
+      }
+    }
+
+    return originalSend(mirrored, options);
+  };
 
   const cleanup = (): void => {
     abortController.abort();
@@ -337,6 +337,13 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
     // getter's declared type.
     await server.connect(transport as Transport);
     await transport.handleRequest(req, res, bodyResult.body);
+    logMcpRequest({
+      method: mcpMethod,
+      httpStatus: res.statusCode,
+      hasAuthorization,
+      toolNames: listedToolNames,
+      authChallengeEmitted: toolAuthChallengeEmitted,
+    });
   } catch (err: unknown) {
     logServerError("Failed to handle MCP request.", err);
 
@@ -348,6 +355,14 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
         "The VideoGen MCP server encountered an unexpected error.",
       );
     }
+
+    logMcpRequest({
+      method: mcpMethod,
+      httpStatus: res.headersSent ? res.statusCode : 500,
+      hasAuthorization,
+      toolNames: listedToolNames,
+      authChallengeEmitted: toolAuthChallengeEmitted,
+    });
 
     cleanup();
   }
@@ -413,7 +428,10 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       pathname === OAUTH_PROTECTED_RESOURCE_MCP_PATH) &&
     method === "GET"
   ) {
-    const metadata = buildProtectedResourceMetadata(req);
+    const metadata = buildProtectedResourceMetadata({
+      origin: getRequestOrigin(req),
+      oauthIssuer: config.oauthIssuer,
+    });
 
     if (metadata == null) {
       writeJsonRpcError(res, 404, -32601, "Not found.");

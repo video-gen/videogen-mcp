@@ -147,8 +147,8 @@ export function registerWorkflowTools(
     },
   );
 
-  // SDK 2.x hand-written client has no storyboardToVideo (not on public OpenAPI).
-  // This tool still needs removal or reimplementation before a clean publish.
+  // Storyboard-to-video is on the public OpenAPI; the hand-written SDK exposes
+  // `workflows.storyboardToVideo` for this tool.
   server.registerTool(
     "storyboard_to_video",
     {

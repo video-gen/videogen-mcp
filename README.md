@@ -96,7 +96,7 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 
 `list_avatar_presenters`, `list_tts_voices`, `list_languages`, `get_me`
 
-The workflow, media-tool, and export tools are **composite**: they start the operation and, by default, poll until it reaches a terminal state. Pass `wait: false` to return immediately with the run/execution id, and optionally `pollIntervalMs` / `timeoutMs` to tune waiting. `script_to_video`, `voiceover_to_video`, and `slideshow_to_video` accept `remixActions` (provide at least two for a polished result); `storyboard_to_video` does **not** accept `remixActions`.
+The workflow, media-tool, and export tools are **composite**: they start the operation and, by default, poll until it reaches a terminal state. Pass `wait: false` to return immediately with the run/execution id, and optionally `pollIntervalMs` / `timeoutMs` to tune waiting. `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, and `storyboard_to_video` accept `remixActions` (provide at least two for a polished result); `prompt_to_video_clip` does **not** accept `remixActions`.
 
 See the [full tool reference](https://docs.videogen.io/libraries/mcp) for every tool's parameters and its REST-endpoint mapping.
 
@@ -137,3 +137,17 @@ CI/CD builds and deploys the Cloud Run service, but a couple of steps must be do
 
 1. **Custom domain / DNS.** The service is reachable at its generated `*.run.app` URL immediately. To serve it at `mcp.videogen.io`, create a Cloud Run **domain mapping** (or add it behind the existing load balancer) and add the corresponding DNS record. Update the `url` in the client config above once the domain resolves.
 2. **Verify the first deploy.** After the first successful deploy, confirm `GET https://<service-url>/health` returns `200` and that a `POST /mcp` with a valid bearer token lists tools.
+
+### ChatGPT connector (OAuth) checklist
+
+After deploying the remote MCP server for an environment (e.g. DEV → `https://dev.mcp.videogen.io/mcp`):
+
+1. Confirm anonymous discovery works:
+   - `GET https://<mcp-host>/.well-known/oauth-protected-resource` returns `200` with `resource` ending in `/mcp` and a Supabase `authorization_servers` entry.
+   - `npx -y @modelcontextprotocol/inspector@1.0.0 --cli https://<mcp-host>/mcp --transport http --method tools/list` lists ~35+ tools (including `open_uploader` as `noauth` and API tools as `oauth2`).
+2. In the ChatGPT app (e.g. **VideoGen (DEV)**), copy the exact OAuth callback URL (`https://chatgpt.com/connector/oauth/{callback_id}`) into that environment's Supabase Auth OAuth client redirect allowlist.
+3. Prefer **DCR** in the ChatGPT connector builder (Supabase advertises `registration_endpoint`; it does not advertise CIMD / `client_id_metadata_document_supported`).
+4. ChatGPT Settings → the app → **Refresh** → **Scan Tools** → complete the OAuth prompt when shown.
+5. Start a **new** conversation, select the app from the tools menu, and call a read tool (e.g. `get_me`). Do not reuse an old chat after metadata changes.
+
+STANDARD_TESTS runs this discovery path automatically via `mcp-http` (`pnpm --filter @videogen/api mcp:test -- --transport http --env <env> --server-mode remote`), which invokes the Inspector CLI before the authenticated full smoke and asserts `open_uploader` advertises `noauth` and API tools advertise `oauth2`. That scheme check fails against a host that has not yet been redeployed with this metadata.

@@ -61,7 +61,8 @@ export function registerFileTools(
     type: "IMAGE" | "VIDEO" | "AUDIO" | undefined;
   }): Promise<CallToolResult> =>
     await respondSdk(() =>
-      uploadFile(getClient(), {
+      uploadFile({
+        client: getClient(),
         data: bytes,
         displayName,
         ...(type != null ? { type } : {}),
@@ -251,7 +252,9 @@ export function registerFileTools(
         });
       }
 
-      return await respondSdk(() => getHydratedFile(getClient(), args.fileId));
+      return await respondSdk(() =>
+        getHydratedFile({ client: getClient(), fileId: args.fileId }),
+      );
     },
   );
 

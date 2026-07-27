@@ -72,6 +72,10 @@ export function registerUploadWidget(server: McpServer): void {
         // `ui.resourceUri`; set both so the widget renders across hosts.
         ui: { resourceUri: UPLOAD_WIDGET_URI },
         "openai/outputTemplate": UPLOAD_WIDGET_URI,
+        // Opens the widget only — no VideoGen API call. Advertise `noauth` so
+        // ChatGPT can surface a callable tool before OAuth linking; the widget
+        // itself uses the host's linked credential for upload.
+        securitySchemes: [{ type: "noauth" }],
       },
     },
     () => ({
