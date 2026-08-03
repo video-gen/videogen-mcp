@@ -9,7 +9,10 @@ import { defineConfig } from "tsup";
  * output that runs first.
  */
 export default defineConfig({
-  entry: { uploadWidget: "web/uploadWidget.tsx" },
+  entry: {
+    uploadWidget: "web/uploadWidget.tsx",
+    mediaPreviewWidget: "web/mediaPreviewWidget.tsx",
+  },
   outDir: "dist/widget",
   format: ["iife"],
   platform: "browser",

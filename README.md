@@ -18,7 +18,7 @@ This is distinct from the hosted **documentation** MCP at `https://docs.videogen
 
 ## Configuration
 
-Get an API key from [app.videogen.io/developers](https://app.videogen.io/developers). Both transports expose the same tools; the remote server is recommended.
+Get an API key from [app.videogen.io/api](https://app.videogen.io/api). Both transports expose the same tools; the remote server is recommended.
 
 ### Remote (Streamable HTTP) — recommended
 
@@ -84,7 +84,7 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 
 ### Projects
 
-`list_projects`, `get_project`, `export_project`, `remix_project`, `list_project_remix_actions`
+`list_projects`, `get_project`, `export_project`, `get_project_export`, `remix_project`, `list_project_remix_actions`
 
 ### Files
 
@@ -94,9 +94,9 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 
 ### Resources & account
 
-`list_avatar_presenters`, `list_tts_voices`, `list_languages`, `get_me`
+`list_avatar_presenters`, `list_tts_voices`, `list_languages`, `get_me`, `get_app_deep_link`
 
-The workflow, media-tool, and export tools are **composite**: they start the operation and, by default, poll until it reaches a terminal state. Pass `wait: false` to return immediately with the run/execution id, and optionally `pollIntervalMs` / `timeoutMs` to tune waiting. `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, and `storyboard_to_video` accept `remixActions` (provide at least two for a polished result); `prompt_to_video_clip` does **not** accept `remixActions`.
+The workflow, media-tool, and export tools are **composite**: they start the operation and, by default, poll until it reaches a terminal state. Pass `wait: false` to return immediately with the run/execution id, and optionally `pollIntervalMs` / `timeoutMs` to tune waiting. On the **hosted** (Streamable HTTP) server, wait windows are capped under Cloudflare's ~100s proxy read timeout so long generations return a still-running snapshot instead of a 524 — poll `get_tool_execution` / `get_workflow_run` / `get_project_export` to finish. `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, and `storyboard_to_video` accept `remixActions` (provide at least two for a polished result); `prompt_to_video_clip` does **not** accept `remixActions`.
 
 See the [full tool reference](https://docs.videogen.io/libraries/mcp) for every tool's parameters and its REST-endpoint mapping.
 
@@ -142,12 +142,15 @@ CI/CD builds and deploys the Cloud Run service, but a couple of steps must be do
 
 After deploying the remote MCP server for an environment (e.g. DEV → `https://dev.mcp.videogen.io/mcp`):
 
-1. Confirm anonymous discovery works:
-   - `GET https://<mcp-host>/.well-known/oauth-protected-resource` returns `200` with `resource` ending in `/mcp` and a Supabase `authorization_servers` entry.
+1. Confirm discovery + auth modes:
+   - `GET https://<mcp-host>/.well-known/oauth-protected-resource/mcp` returns `200` with `resource` ending in `/mcp`.
+   - `GET https://<mcp-host>/.well-known/oauth-protected-resource/mcp/chatgpt` returns `200` with `resource` ending in `/mcp/chatgpt`.
    - `npx -y @modelcontextprotocol/inspector@1.0.0 --cli https://<mcp-host>/mcp --transport http --method tools/list` lists ~35+ tools (including `open_uploader` as `noauth` and API tools as `oauth2`).
-2. In the ChatGPT app (e.g. **VideoGen (DEV)**), copy the exact OAuth callback URL (`https://chatgpt.com/connector/oauth/{callback_id}`) into that environment's Supabase Auth OAuth client redirect allowlist.
+   - Anonymous `tools/call get_me` against `/mcp` returns HTTP **401** + `WWW-Authenticate` (Cursor / Claude).
+   - Anonymous `tools/call get_me` against `/mcp/chatgpt` returns HTTP **200** with a tool-result `_meta["mcp/www_authenticate"]` challenge (ChatGPT).
+2. In the ChatGPT app (e.g. **VideoGen (DEV)**), set the MCP URL to `https://<mcp-host>/mcp/chatgpt` (not `/mcp`). Copy the exact OAuth callback URL (`https://chatgpt.com/connector/oauth/{callback_id}`) into that environment's Supabase Auth OAuth client redirect allowlist.
 3. Prefer **DCR** in the ChatGPT connector builder (Supabase advertises `registration_endpoint`; it does not advertise CIMD / `client_id_metadata_document_supported`).
 4. ChatGPT Settings → the app → **Refresh** → **Scan Tools** → complete the OAuth prompt when shown.
 5. Start a **new** conversation, select the app from the tools menu, and call a read tool (e.g. `get_me`). Do not reuse an old chat after metadata changes.
 
-STANDARD_TESTS runs this discovery path automatically via `mcp-http` (`pnpm --filter @videogen/api mcp:test -- --transport http --env <env> --server-mode remote`), which invokes the Inspector CLI before the authenticated full smoke and asserts `open_uploader` advertises `noauth` and API tools advertise `oauth2`. That scheme check fails against a host that has not yet been redeployed with this metadata.
+STANDARD_TESTS runs discovery against `/mcp` automatically via `mcp-http` (`pnpm --filter @videogen/api mcp:test -- --transport http --env <env> --server-mode remote`), which invokes the Inspector CLI before the authenticated full smoke and asserts `open_uploader` advertises `noauth` and API tools advertise `oauth2`. That scheme check fails against a host that has not yet been redeployed with this metadata.

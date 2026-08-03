@@ -41,7 +41,7 @@ export function readEnv(): ReadEnvResult {
     return {
       ok: false,
       message:
-        "VIDEOGEN_API_KEY is not set. Create a key at https://app.videogen.io/developers and pass it to the MCP server via the VIDEOGEN_API_KEY environment variable.",
+        "VIDEOGEN_API_KEY is not set. Create a key at https://app.videogen.io/api and pass it to the MCP server via the VIDEOGEN_API_KEY environment variable.",
     };
   }
 

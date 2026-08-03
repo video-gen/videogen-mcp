@@ -13,7 +13,8 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "."
   },
   "include": ["*.tsx", "*.ts"],
   "exclude": ["node_modules"]

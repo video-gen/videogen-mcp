@@ -1,4 +1,4 @@
-import { StrictMode, useCallback, useRef, useState } from "react";
+import { StrictMode, useCallback, useRef, useState, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 
 /**
@@ -104,7 +104,7 @@ const PHASE_LABEL: Record<Exclude<UploadPhase, "idle" | "error">, string> = {
   done: "Upload complete",
 };
 
-function UploadWidget(): JSX.Element {
+function UploadWidget(): ReactElement {
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);

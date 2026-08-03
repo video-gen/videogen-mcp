@@ -12,6 +12,14 @@ const TERMINAL_STATUSES = new Set(["succeeded", "failed", "cancelled", "canceled
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
+/**
+ * Cloudflare's proxy read timeout in front of the hosted MCP is ~100s (524 when
+ * exceeded). Cap server-side wait-to-terminal / wait-until-ready loops under that
+ * so we return a snapshot the client can keep polling via get_* tools, instead of
+ * letting the proxy cut the connection mid-wait.
+ */
+export const HOSTED_PROXY_SAFE_MAX_WAIT_MS = 90 * 1000;
+
 const startedResponseSchema = z.object({
   workflowRunId: z.string().optional(),
   toolExecutionId: z.string().optional(),
@@ -29,8 +37,6 @@ export type PollControls = {
   timeoutMs?: number;
 };
 
-type DefinedProps<T> = { [K in keyof T]: Exclude<T[K], undefined> };
-
 /**
  * STOPSHIP: rip this out once https://github.com/fern-api/fern/pull/16972 merges,
  * ships in a new @videogen/sdk, and we bump to it. That PR makes Fern emit optional
@@ -42,8 +48,12 @@ type DefinedProps<T> = { [K in keyof T]: Exclude<T[K], undefined> };
  * declare optionals as plain `T?` — which, under `exactOptionalPropertyTypes`,
  * rejects an explicit `undefined`. Dropping the empty keys makes a
  * runtime-validated tool-arguments object assignable to the SDK request type.
+ *
+ * Return type is `never` (via assertion) so the stripped object is assignable to
+ * every concrete SDK request shape; nested Zod/`unknown[]` fields are still not
+ * expressible as those shapes under strictFunctionTypes + eOPT.
  */
-export function dropUndefined<T extends Record<string, unknown>>(obj: T): DefinedProps<T> {
+export function dropUndefined(obj: Record<string, unknown>): never {
   const result: Record<string, unknown> = {};
 
   for (const key of Object.keys(obj)) {
@@ -54,9 +64,9 @@ export function dropUndefined<T extends Record<string, unknown>>(obj: T): Define
   }
 
   // We intentionally use an unsafe `as` assertion here because we have removed
-  // exactly the `undefined` values that distinguish `T` from `DefinedProps<T>`,
-  // a narrowing TypeScript cannot express through an iterative object build.
-  return result as DefinedProps<T>;
+  // undefined-valued keys at runtime, and the result must type-check as every
+  // SDK request shape that call sites pass it to (see STOPSHIP above).
+  return result as never;
 }
 
 /** Normalizes optional poll-control inputs (which may be undefined) into a compact PollControls object. */
@@ -180,7 +190,21 @@ export function createMcpOperations(
   oauthContext: McpOAuthContext | null,
   abortSignal?: AbortSignal | null,
   hasCredentials: boolean = true,
+  /**
+   * When set (HOSTED Streamable HTTP behind Cloudflare), clamp every wait window
+   * to this ceiling so long-polls cannot outlive the proxy read timeout.
+   */
+  maxWaitMs?: number | null,
 ): McpOperations {
+  const resolveWaitTimeoutMs = (requestedTimeoutMs: number | undefined): number => {
+    const requestedOrDefault = requestedTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+    if (maxWaitMs == null) {
+      return requestedOrDefault;
+    }
+
+    return Math.min(requestedOrDefault, maxWaitMs);
+  };
   const toErrorResult = (err: unknown): CallToolResult => {
     const message = getErrorMessage(err);
 
@@ -260,7 +284,7 @@ export function createMcpOperations(
       }
 
       const intervalMs = args.controls.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-      const deadline = Date.now() + (args.controls.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      const deadline = Date.now() + resolveWaitTimeoutMs(args.controls.timeoutMs);
 
       let snapshot = await args.poll(id);
       while (!getIsTerminal(snapshot) && Date.now() < deadline && !isAborted(abortSignal)) {
@@ -296,7 +320,7 @@ export function createMcpOperations(
 
     try {
       const intervalMs = args.controls.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-      const deadline = Date.now() + (args.controls.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      const deadline = Date.now() + resolveWaitTimeoutMs(args.controls.timeoutMs);
 
       let snapshot = await args.poll();
       while (!args.isReady(snapshot) && Date.now() < deadline && !isAborted(abortSignal)) {

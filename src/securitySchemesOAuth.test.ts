@@ -21,7 +21,10 @@ const securitySchemesSchema = z.array(
 );
 
 async function listToolsWithOAuth(): Promise<{
-  tools: Array<{ name: string; _meta?: { securitySchemes?: unknown } }>;
+  tools: Array<{
+    name: string;
+    _meta?: { securitySchemes?: unknown | undefined } | undefined;
+  }>;
 }> {
   const videoGenClient = createVideoGenClientFromToken({
     bearerToken: "test-key",
@@ -37,27 +40,40 @@ async function listToolsWithOAuth(): Promise<{
   await client.connect(clientTransport);
 
   try {
-    return await client.listTools();
+    const listed = await client.listTools();
+    return {
+      tools: listed.tools.map((tool) => ({
+        name: tool.name,
+        _meta: tool._meta,
+      })),
+    };
   } finally {
     await client.close();
   }
 }
 
-void test("OAuth-enabled HOSTED tools advertise oauth2 except open_uploader (noauth)", async () => {
+void test("OAuth-enabled HOSTED tools advertise oauth2 except open_uploader and get_app_deep_link (noauth)", async () => {
   const { tools } = await listToolsWithOAuth();
 
   const openUploader = tools.find((tool) => tool.name === "open_uploader");
+  const getAppDeepLink = tools.find((tool) => tool.name === "get_app_deep_link");
   const getMe = tools.find((tool) => tool.name === "get_me");
 
   assert.ok(openUploader != null);
+  assert.ok(getAppDeepLink != null);
   assert.ok(getMe != null);
 
   const openUploaderSchemes = securitySchemesSchema.safeParse(openUploader._meta?.securitySchemes);
+  const getAppDeepLinkSchemes = securitySchemesSchema.safeParse(
+    getAppDeepLink._meta?.securitySchemes,
+  );
   const getMeSchemes = securitySchemesSchema.safeParse(getMe._meta?.securitySchemes);
 
   assert.ok(openUploaderSchemes.success);
+  assert.ok(getAppDeepLinkSchemes.success);
   assert.ok(getMeSchemes.success);
   assert.deepEqual(openUploaderSchemes.data, [{ type: "noauth" }]);
+  assert.deepEqual(getAppDeepLinkSchemes.data, [{ type: "noauth" }]);
   assert.deepEqual(getMeSchemes.data, [{ type: "oauth2", scopes: ["email", "profile"] }]);
 });
 
@@ -86,8 +102,10 @@ void test("mirrorSecuritySchemesToTopLevel promotes open_uploader noauth and get
     .parse(result);
 
   const openUploader = toolsWithTopLevel.tools.find((tool) => tool.name === "open_uploader");
+  const getAppDeepLink = toolsWithTopLevel.tools.find((tool) => tool.name === "get_app_deep_link");
   const getMe = toolsWithTopLevel.tools.find((tool) => tool.name === "get_me");
 
   assert.deepEqual(openUploader?.securitySchemes, [{ type: "noauth" }]);
+  assert.deepEqual(getAppDeepLink?.securitySchemes, [{ type: "noauth" }]);
   assert.deepEqual(getMe?.securitySchemes, [{ type: "oauth2", scopes: ["email", "profile"] }]);
 });

@@ -5,10 +5,27 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { getHydratedFile, uploadFile } from "@videogen/sdk";
 import { z } from "zod";
 import type { McpExecutionMode } from "../buildServer";
+import { MEDIA_PREVIEW_TOOL_META } from "../appWidget";
 import type { GetVideoGenClient } from "../client";
-import { type McpOperations, dropUndefined, extractControls } from "../operations";
+import {
+  createFileUploadInputSchema,
+  getFileInputSchema,
+  listFilesInputSchema,
+  uploadFileHostedInputSchema,
+  uploadFileLocalInputSchema,
+} from "../inputSchemas";
+import {
+  type McpOperations,
+  HOSTED_PROXY_SAFE_MAX_WAIT_MS,
+  dropUndefined,
+  extractControls,
+} from "../operations";
+import {
+  fileOutputSchema,
+  fileUploadOutputSchema,
+  listFilesOutputSchema,
+} from "../outputSchemas";
 import { errorResult } from "../result";
-import { cursorField, limitField } from "../schemas";
 
 /**
  * Upper bound on the decoded size of an inline (base64) upload on the HOSTED
@@ -50,7 +67,11 @@ export function registerFileTools(
   getClient: GetVideoGenClient,
   executionMode: McpExecutionMode,
   { respondSdk, awaitReady, toErrorResult }: McpOperations,
+  mediaPreviewMeta: typeof MEDIA_PREVIEW_TOOL_META | null,
 ): void {
+  const mediaPreviewToolFields =
+    mediaPreviewMeta != null ? { _meta: mediaPreviewMeta } : {};
+
   const finalizeUpload = async ({
     bytes,
     displayName,
@@ -66,15 +87,11 @@ export function registerFileTools(
         data: bytes,
         displayName,
         ...(type != null ? { type } : {}),
+        // Hosted MCP sits behind Cloudflare's ~100s proxy read timeout. Cap the
+        // SDK's post-PUT poll so we fail with a clear error instead of a 524.
+        ...(executionMode === "HOSTED" ? { timeoutMs: HOSTED_PROXY_SAFE_MAX_WAIT_MS } : {}),
       }),
     );
-
-  // The SDK `uploadFile` helper accepts only these three types; leave PDF /
-  // SLIDESHOW to `create_file_upload` (or omit the type and let it be inferred).
-  const uploadFileTypeField = z
-    .enum(["IMAGE", "VIDEO", "AUDIO"])
-    .optional()
-    .describe("File type. Inferred when omitted.");
 
   if (executionMode === "LOCAL") {
     // On stdio the server runs on the caller's own machine, so it can read the
@@ -85,14 +102,9 @@ export function registerFileTools(
         title: "Upload file",
         description:
           "Upload a local file to VideoGen and wait until it is processed. Returns the file with its id (vg_file_...) and signed URLs. Use the returned fileId for voiceover_to_video, slideshow_to_video, logos, or B-roll. To upload a remote asset, download it first and pass its local path.",
-        inputSchema: {
-          filePath: z.string().describe("Absolute path to a local file to upload."),
-          displayName: z
-            .string()
-            .optional()
-            .describe("Display name for the file. Defaults to the source file name."),
-          type: uploadFileTypeField,
-        },
+        inputSchema: uploadFileLocalInputSchema,
+        outputSchema: fileOutputSchema,
+        ...mediaPreviewToolFields,
       },
       async (args) => {
         if (args.filePath.length === 0) {
@@ -140,14 +152,9 @@ export function registerFileTools(
         title: "Upload file",
         description:
           "Upload a small file (image, logo, or short audio) to VideoGen by passing its base64-encoded contents, and wait until it is processed. Returns the file with its id (vg_file_...) and signed URLs. Use the returned fileId for voiceover_to_video, slideshow_to_video, logos, or B-roll. For large files, use create_file_upload instead.",
-        inputSchema: {
-          fileData: z.string().describe("Base64-encoded contents of the file to upload."),
-          displayName: z
-            .string()
-            .optional()
-            .describe("Display name for the file. Defaults to 'upload'."),
-          type: uploadFileTypeField,
-        },
+        inputSchema: uploadFileHostedInputSchema,
+        outputSchema: fileOutputSchema,
+        ...mediaPreviewToolFields,
       },
       async (args) => {
         if (args.fileData.length === 0) {
@@ -185,19 +192,8 @@ export function registerFileTools(
       title: "Create file upload",
       description:
         "Start an upload for a large file, or when file bytes cannot be inlined. Returns { fileId, uploadUrl }. PUT the raw file bytes to uploadUrl with NO Authorization header (it is a short-lived pre-signed URL). Then call get_file with { fileId, wait: true } to wait until processing finishes, and pass the returned fileId to workflows, tools, logos, or B-roll. For small files, prefer upload_file.",
-      inputSchema: {
-        displayName: z.string().describe("Display name for the file."),
-        type: z
-          .enum(["IMAGE", "VIDEO", "AUDIO", "PDF", "SLIDESHOW"])
-          .optional()
-          .describe("File type. Inferred after processing when omitted."),
-        isTemporary: z
-          .boolean()
-          .optional()
-          .describe(
-            "When true, the file is temporary (guaranteed available for 24 hours, not analyzed for search). Defaults to false.",
-          ),
-      },
+      inputSchema: createFileUploadInputSchema,
+      outputSchema: fileUploadOutputSchema,
     },
     async (args) =>
       await respondSdk(() =>
@@ -217,27 +213,9 @@ export function registerFileTools(
       title: "Get file",
       description:
         "Fetch a file by id with freshly hydrated (non-expired) signed URLs for its thumbnail, preview, and download renditions. Set wait: true to poll until the file finishes processing — use this right after PUTting bytes to a create_file_upload URL.",
-      inputSchema: {
-        fileId: z.string().describe("File id (vg_file_...)."),
-        wait: z
-          .boolean()
-          .optional()
-          .describe(
-            "When true, poll until the file finishes processing and a rendition is ready. Defaults to false (a single fetch).",
-          ),
-        pollIntervalMs: z
-          .number()
-          .int()
-          .positive()
-          .optional()
-          .describe("How often to poll while waiting, in milliseconds."),
-        timeoutMs: z
-          .number()
-          .int()
-          .positive()
-          .optional()
-          .describe("Maximum time to wait for processing before giving up, in milliseconds."),
-      },
+      inputSchema: getFileInputSchema,
+      outputSchema: fileOutputSchema,
+      ...mediaPreviewToolFields,
     },
     async (args) => {
       if (args.wait === true) {
@@ -263,7 +241,8 @@ export function registerFileTools(
     {
       title: "List files",
       description: "List files visible to the current API key.",
-      inputSchema: { cursor: cursorField, limit: limitField },
+      inputSchema: listFilesInputSchema,
+      outputSchema: listFilesOutputSchema,
     },
     async (args) => await respondSdk(() => getClient().files.getFiles(dropUndefined(args))),
   );

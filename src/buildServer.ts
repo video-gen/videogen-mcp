@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GetVideoGenClient } from "./client";
-import { type McpOAuthContext, createMcpOperations } from "./operations";
+import { type McpOAuthContext, HOSTED_PROXY_SAFE_MAX_WAIT_MS, createMcpOperations } from "./operations";
 import { registerTools } from "./registerTools";
 
 export const SERVER_NAME = "videogen";
@@ -74,10 +74,11 @@ export type McpExecutionMode = "LOCAL" | "HOSTED";
  *
  * `hasCredentials` is whether the caller presented a bearer token. On an
  * OAuth-enabled server, discovery (`initialize` / `tools/list`) is served
- * unauthenticated so hosts can enumerate tools; a tool INVOCATION without
- * credentials then short-circuits to the OAuth sign-in challenge on the tool
- * result (see `createMcpOperations`) before `getClient` is ever called. Stdio
- * always carries a key, so it passes `true`.
+ * unauthenticated so hosts can enumerate tools. On `/mcp/chatgpt`, a tool
+ * invocation without credentials short-circuits to the OAuth sign-in challenge
+ * on the tool result (see `createMcpOperations`) before `getClient` is ever
+ * called. On the default `/mcp` path, protected tools are gated with HTTP 401
+ * in `http.ts` instead. Stdio always carries a key, so it passes `true`.
  */
 export function buildMcpServer(
   getClient: GetVideoGenClient,
@@ -96,7 +97,12 @@ export function buildMcpServer(
     server,
     getClient,
     executionMode,
-    createMcpOperations(oauthContext, abortSignal, hasCredentials),
+    createMcpOperations(
+      oauthContext,
+      abortSignal,
+      hasCredentials,
+      executionMode === "HOSTED" ? HOSTED_PROXY_SAFE_MAX_WAIT_MS : null,
+    ),
   );
 
   return server;

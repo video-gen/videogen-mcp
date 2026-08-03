@@ -11,9 +11,11 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 
 /**
- * Boots `dist/http.js` over Streamable HTTP and asserts ChatGPT-critical
- * discovery behavior:
+ * Boots `dist/http.js` over Streamable HTTP and asserts host-critical discovery
+ * / auth behavior:
  *   - OAuth mode: anonymous initialize / tools/list succeed with schemes
+ *   - Default `/mcp`: protected tools/call without Bearer → HTTP 401
+ *   - `/mcp/chatgpt`: protected tools/call without Bearer → soft tool challenge
  *   - API-key mode: missing Bearer → HTTP 401 + WWW-Authenticate
  *
  * Requires a prior `pnpm build` in mcp/ (same as the smoke entry).
@@ -132,8 +134,8 @@ function stopHttpServer(child: ChildProcess): void {
 
 function getToolSecuritySchemes(tool: {
   name: string;
-  securitySchemes?: unknown;
-  _meta?: { securitySchemes?: unknown };
+  securitySchemes?: unknown | undefined;
+  _meta?: { securitySchemes?: unknown | undefined } | undefined;
 }): unknown {
   return tool.securitySchemes ?? tool._meta?.securitySchemes;
 }
@@ -280,6 +282,106 @@ void test("API-key-only mode rejects anonymous /mcp with 401 + WWW-Authenticate"
       result.payload != null &&
         typeof result.payload === "object" &&
         "error" in result.payload,
+    );
+  } finally {
+    stopHttpServer(child);
+  }
+});
+
+void test("default /mcp returns HTTP 401 for protected tools/call without Bearer", async () => {
+  const { child, mcpUrl } = await startHttpServer({
+    VIDEOGEN_OAUTH_ISSUER: OAUTH_ISSUER,
+  });
+
+  try {
+    const result = await postMcpJsonRpc({
+      mcpUrl,
+      body: {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "get_me", arguments: {} },
+      },
+    });
+
+    assert.equal(result.status, 401);
+    assert.ok(result.wwwAuthenticate != null);
+    assert.match(result.wwwAuthenticate, /^Bearer /);
+    assert.ok(result.wwwAuthenticate.includes("resource_metadata="));
+    assert.ok(result.wwwAuthenticate.includes('error="invalid_token"'));
+  } finally {
+    stopHttpServer(child);
+  }
+});
+
+void test("default /mcp still allows anonymous noauth tools/call", async () => {
+  const { child, mcpUrl } = await startHttpServer({
+    VIDEOGEN_OAUTH_ISSUER: OAUTH_ISSUER,
+  });
+
+  try {
+    const result = await postMcpJsonRpc({
+      mcpUrl,
+      body: {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: { name: "open_uploader", arguments: {} },
+      },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.wwwAuthenticate, null);
+  } finally {
+    stopHttpServer(child);
+  }
+});
+
+void test("/mcp/chatgpt returns a soft tool-result challenge (not HTTP 401) for get_me", async () => {
+  const { child, origin } = await startHttpServer({
+    VIDEOGEN_OAUTH_ISSUER: OAUTH_ISSUER,
+  });
+
+  try {
+    const chatgptPrm = await fetch(
+      `${origin}/.well-known/oauth-protected-resource/mcp/chatgpt`,
+    );
+    assert.equal(chatgptPrm.status, 200);
+    const chatgptPrmBody: unknown = await chatgptPrm.json();
+    assert.ok(chatgptPrmBody != null && typeof chatgptPrmBody === "object");
+    assert.equal(
+      "resource" in chatgptPrmBody ? chatgptPrmBody.resource : null,
+      `${origin}/mcp/chatgpt`,
+    );
+
+    const result = await postMcpJsonRpc({
+      mcpUrl: `${origin}/mcp/chatgpt`,
+      body: {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: { name: "get_me", arguments: {} },
+      },
+    });
+
+    // ChatGPT path must NOT use transport 401 — soft challenge on the tool result.
+    assert.equal(result.status, 200);
+    assert.ok(result.payload != null && typeof result.payload === "object");
+    assert.ok("result" in result.payload);
+
+    const toolResult = result.payload.result;
+    assert.ok(toolResult != null && typeof toolResult === "object");
+    assert.equal("isError" in toolResult ? toolResult.isError : null, true);
+
+    const meta =
+      "_meta" in toolResult && toolResult._meta != null && typeof toolResult._meta === "object"
+        ? toolResult._meta
+        : null;
+    const challenges =
+      meta != null && "mcp/www_authenticate" in meta ? meta["mcp/www_authenticate"] : null;
+    assert.ok(Array.isArray(challenges) && challenges.length >= 1);
+    assert.ok(
+      typeof challenges[0] === "string" && challenges[0].includes("resource_metadata="),
     );
   } finally {
     stopHttpServer(child);

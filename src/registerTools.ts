@@ -1,9 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { MEDIA_PREVIEW_TOOL_META } from "./appWidget";
 import type { McpExecutionMode } from "./buildServer";
 import type { GetVideoGenClient } from "./client";
 import type { McpOperations } from "./operations";
 import { registerAccountTools } from "./tools/account";
+import { registerAppDeepLinkTool } from "./tools/appDeepLink";
 import { registerFileTools } from "./tools/files";
+import { registerMediaPreviewWidget } from "./tools/mediaPreviewWidget";
 import { registerMediaToolTools } from "./tools/mediaTools";
 import { registerProjectTools } from "./tools/projects";
 import { registerResourceTools } from "./tools/resources";
@@ -16,17 +19,20 @@ export function registerTools(
   executionMode: McpExecutionMode,
   operations: McpOperations,
 ): void {
+  const mediaPreviewMeta = executionMode === "HOSTED" ? MEDIA_PREVIEW_TOOL_META : null;
+
   registerWorkflowTools(server, getClient, operations);
-  registerMediaToolTools(server, getClient, operations);
-  registerProjectTools(server, getClient, operations);
-  registerFileTools(server, getClient, executionMode, operations);
+  registerMediaToolTools(server, getClient, operations, mediaPreviewMeta);
+  registerProjectTools(server, getClient, operations, mediaPreviewMeta);
+  registerFileTools(server, getClient, executionMode, operations, mediaPreviewMeta);
   registerResourceTools(server, getClient, operations);
   registerAccountTools(server, getClient, operations);
+  registerAppDeepLinkTool(server);
 
-  // The ChatGPT App upload widget needs the MCP Apps host bridge (`window.openai`),
-  // which only the HOSTED (Streamable HTTP) transport is reached through; the
-  // LOCAL stdio transport uploads by file path instead.
+  // ChatGPT App widgets need the MCP Apps host bridge (`window.openai`), which
+  // only the HOSTED (Streamable HTTP) transport is reached through.
   if (executionMode === "HOSTED") {
     registerUploadWidget(server);
+    registerMediaPreviewWidget(server);
   }
 }

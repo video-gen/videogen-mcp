@@ -1,8 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 import type { GetVideoGenClient } from "../client";
+import {
+  listAvatarPresentersInputSchema,
+  listLanguagesInputSchema,
+  listTtsVoicesInputSchema,
+} from "../inputSchemas";
 import { type McpOperations, dropUndefined } from "../operations";
-import { cursorField, limitField } from "../schemas";
+import {
+  listAvatarPresentersOutputSchema,
+  listLanguagesOutputSchema,
+  listTtsVoicesOutputSchema,
+} from "../outputSchemas";
 
 export function registerResourceTools(
   server: McpServer,
@@ -15,11 +23,8 @@ export function registerResourceTools(
       title: "List avatar presenters",
       description:
         "List available talking-head avatar presenters for generate_avatar and workflows.",
-      inputSchema: {
-        cursor: cursorField,
-        limit: limitField,
-        voiceId: z.string().optional().describe("Filter presenters compatible with this voice id."),
-      },
+      inputSchema: listAvatarPresentersInputSchema,
+      outputSchema: listAvatarPresentersOutputSchema,
     },
     async (args) =>
       await respondSdk(() => getClient().resources.listAvatarPresenters(dropUndefined(args))),
@@ -31,14 +36,8 @@ export function registerResourceTools(
       title: "List text-to-speech voices",
       description:
         "List available text-to-speech voices for narration, text_to_speech, and workflows.",
-      inputSchema: {
-        cursor: cursorField,
-        limit: limitField,
-        includeDeprecatedVoices: z
-          .boolean()
-          .optional()
-          .describe("Include deprecated voices in the results."),
-      },
+      inputSchema: listTtsVoicesInputSchema,
+      outputSchema: listTtsVoicesOutputSchema,
     },
     async (args) => await respondSdk(() => getClient().resources.listTtsVoices(dropUndefined(args))),
   );
@@ -48,7 +47,8 @@ export function registerResourceTools(
     {
       title: "List languages",
       description: "List supported languages for narration and captions.",
-      inputSchema: {},
+      inputSchema: listLanguagesInputSchema,
+      outputSchema: listLanguagesOutputSchema,
     },
     async () => await respondSdk(() => getClient().resources.listLanguages()),
   );

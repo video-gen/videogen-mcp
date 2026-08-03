@@ -192,7 +192,7 @@ async function main(): Promise<void> {
 
   if (apiKey == null || apiKey === "") {
     console.error(
-      "[mcp-smoke] VIDEOGEN_API_KEY is required. Create a key at https://app.videogen.io/developers.",
+      "[mcp-smoke] VIDEOGEN_API_KEY is required. Create a key at https://app.videogen.io/api.",
     );
     process.exit(1);
   }

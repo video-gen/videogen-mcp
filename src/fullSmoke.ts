@@ -24,9 +24,10 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
  *     rendering quality we don't control, and storyboard_to_video has no
  *     implementation in the current SDK (see the tool's own comment). They are
  *     still invoked and their outcome logged.
- *   - Long-running (awaited) calls pass a large client-side request timeout so the
- *     server's built-in wait-to-terminal polling isn't cut off by the SDK's 60s
- *     default.
+ *   - Long-running (awaited) calls start with `wait: false`, then poll
+ *     `get_tool_execution` / `get_workflow_run` / `get_project_export` with short
+ *     HTTP requests so each request stays under Cloudflare's ~100s proxy read
+ *     timeout (a single wait-to-terminal call would 524).
  */
 
 // Every tool registered on the HOSTED (Streamable HTTP) server — see
@@ -62,6 +63,7 @@ const ALL_HOSTED_TOOLS = [
   "list_projects",
   "get_project",
   "export_project",
+  "get_project_export",
   "remix_project",
   "list_project_remix_actions",
   // files
@@ -75,6 +77,7 @@ const ALL_HOSTED_TOOLS = [
   "list_languages",
   // account
   "get_me",
+  "get_app_deep_link",
   // upload widget (HOSTED only)
   "open_uploader",
 ];
@@ -83,14 +86,12 @@ const ALL_HOSTED_TOOLS = [
 const BEST_EFFORT_TOOLS = new Set(["slideshow_to_video", "storyboard_to_video"]);
 
 // Long-running awaited calls (generation/workflow/export) can take many minutes.
-// The client request timeout must comfortably exceed the server-side wait window
-// so the SDK's 60s default doesn't abort the server's wait-to-terminal poll.
-const LONG_CALL_TIMEOUT_MS = 25 * 60 * 1000;
-
-// Server-side wait window: how long a composite tool polls for a terminal state
-// before returning the latest (possibly non-terminal) snapshot. Kept under the
-// client timeout above.
+// The hosted MCP sits behind Cloudflare's ~100s proxy read timeout, so each
+// individual tools/call HTTP request must finish under that. The smoke starts
+// with wait:false, then polls get_* with short requests until terminal.
+const LONG_CALL_TIMEOUT_MS = 60 * 1000;
 const LONG_POLL_TIMEOUT_MS = 20 * 60 * 1000;
+const LONG_POLL_INTERVAL_MS = 3000;
 
 // A valid 1x1 transparent PNG, used as the source image for image tools.
 const PNG_1X1_BASE64 =
@@ -217,6 +218,35 @@ function assertTerminalSuccess(json: unknown, label: string): void {
   throw new Error(`${label} did not reach a terminal state in time (status "${status}")`);
 }
 
+function getIsTerminalSnapshot(json: unknown): boolean {
+  const downloadUrl = readString(json, "downloadUrl");
+
+  if (downloadUrl != null && downloadUrl !== "") {
+    return true;
+  }
+
+  const status = readString(json, "status");
+
+  if (status == null) {
+    return false;
+  }
+
+  const normalized = status.toLowerCase();
+
+  return (
+    normalized === "succeeded" ||
+    normalized === "failed" ||
+    normalized === "cancelled" ||
+    normalized === "canceled"
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 /**
  * Per-case credit sampling. The "run all tests" job injects
  * `TEST_SAMPLE_RATE_PERCENT` into this suite's env (see `runTestSuite`); each
@@ -273,32 +303,85 @@ export async function runFullCoverage({
   log(`[mcp-smoke] full coverage: ${ALL_HOSTED_TOOLS.length} tools advertised, exercising each...`);
 
   // Invokes a tool, throwing on an error result so a step can `await` it directly.
-  // `longRunning` widens the client request timeout for awaited generations.
+  // `longRunning` starts with wait:false then polls get_* with short HTTP requests
+  // so each call stays under Cloudflare's ~100s proxy read timeout.
   const call = async (
     name: string,
     args: Record<string, unknown>,
     { longRunning = false }: { longRunning?: boolean } = {},
   ): Promise<unknown> => {
-    // For awaited long-running tools, widen the server-side wait window (unless the
-    // caller set its own) so the poll doesn't return a still-running snapshot early.
-    const finalArgs =
-      longRunning && args.timeoutMs == null ? { ...args, timeoutMs: LONG_POLL_TIMEOUT_MS } : args;
-    const result = await client.callTool(
-      { name, arguments: finalArgs },
-      undefined,
-      longRunning ? { timeout: LONG_CALL_TIMEOUT_MS, maxTotalTimeout: LONG_CALL_TIMEOUT_MS } : {},
-    );
-    const text = extractResultText(result);
+    const invoke = async (
+      toolName: string,
+      toolArgs: Record<string, unknown>,
+    ): Promise<unknown> => {
+      const result = await client.callTool(
+        { name: toolName, arguments: toolArgs },
+        undefined,
+        longRunning
+          ? { timeout: LONG_CALL_TIMEOUT_MS, maxTotalTimeout: LONG_CALL_TIMEOUT_MS }
+          : {},
+      );
+      const text = extractResultText(result);
 
-    if (readProp(result, "isError") === true) {
-      throw new Error(`isError: ${truncate(text)}`);
+      if (readProp(result, "isError") === true) {
+        throw new Error(`isError: ${truncate(text)}`);
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    };
+
+    if (!longRunning) {
+      return await invoke(name, args);
     }
 
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
+    // upload_file / get_file manage their own readiness wait; do not inject wait:false.
+    if (name === "upload_file" || name === "get_file") {
+      return await invoke(name, args);
     }
+
+    // Start without holding the HTTP connection open for the whole generation.
+    const started = await invoke(name, { ...args, wait: false });
+
+    if (getIsTerminalSnapshot(started)) {
+      return started;
+    }
+
+    const toolExecutionId = readString(started, "toolExecutionId");
+    const workflowRunId = readString(started, "workflowRunId");
+    const exportId = readString(started, "exportId");
+    const projectId =
+      typeof args.projectId === "string" ? args.projectId : readString(started, "projectId");
+
+    const deadline = Date.now() + LONG_POLL_TIMEOUT_MS;
+    let snapshot: unknown = started;
+
+    while (!getIsTerminalSnapshot(snapshot) && Date.now() < deadline) {
+      await sleep(LONG_POLL_INTERVAL_MS);
+
+      if (toolExecutionId != null) {
+        snapshot = await invoke("get_tool_execution", { toolExecutionId });
+        continue;
+      }
+
+      if (workflowRunId != null) {
+        snapshot = await invoke("get_workflow_run", { workflowRunId });
+        continue;
+      }
+
+      if (exportId != null && projectId != null) {
+        snapshot = await invoke("get_project_export", { projectId, exportId });
+        continue;
+      }
+
+      // upload_file and other non-composite long polls: nothing further to poll.
+      break;
+    }
+
+    return snapshot;
   };
 
   // Runs one named step, recording its outcome. A best-effort step that throws is
@@ -336,21 +419,38 @@ export async function runFullCoverage({
   };
 
   // Shared context threaded across steps.
+  // `| undefined` on optionals is required under exactOptionalPropertyTypes so
+  // we can assign `findPrefixedId(...) ?? undefined`.
   const ctx: {
-    voiceId?: string;
-    presenterId?: string;
-    imageFileId?: string;
-    audioFileId?: string;
-    videoFileId?: string;
-    pdfFileId?: string;
-    toolExecutionId?: string;
-    workflowRunId?: string;
-    projectId?: string;
+    voiceId?: string | undefined;
+    presenterId?: string | undefined;
+    imageFileId?: string | undefined;
+    audioFileId?: string | undefined;
+    videoFileId?: string | undefined;
+    pdfFileId?: string | undefined;
+    toolExecutionId?: string | undefined;
+    workflowRunId?: string | undefined;
+    projectId?: string | undefined;
   } = {};
 
   // ---- account + read-only resource/list tools ----
   await step("get_me", async () => {
     await call("get_me", {});
+  });
+
+  await step("get_app_deep_link", async () => {
+    const result = await call("get_app_deep_link", { action: "OPEN_UPGRADE" });
+    if (
+      typeof result !== "object" ||
+      result == null ||
+      !("url" in result) ||
+      typeof result.url !== "string" ||
+      !result.url.includes("vg_action=OPEN_UPGRADE")
+    ) {
+      throw new Error("get_app_deep_link should return an OPEN_UPGRADE app URL");
+    }
+
+    return result.url;
   });
 
   await step("list_languages", async () => {
@@ -387,11 +487,15 @@ export async function runFullCoverage({
 
   // ---- uploads (image via inline base64; PDF via pre-signed PUT) ----
   await step("upload_file", async () => {
-    const json = await call("upload_file", {
-      fileData: PNG_1X1_BASE64,
-      displayName: "mcp-smoke.png",
-      type: "IMAGE",
-    });
+    const json = await call(
+      "upload_file",
+      {
+        fileData: PNG_1X1_BASE64,
+        displayName: "mcp-smoke.png",
+        type: "IMAGE",
+      },
+      { longRunning: true },
+    );
     ctx.imageFileId = findPrefixedId(json, "vg_file_") ?? undefined;
 
     if (ctx.imageFileId == null) {
@@ -721,10 +825,7 @@ export async function runFullCoverage({
     const json = await call(
       "storyboard_to_video",
       {
-        scenes: [
-          { narration: "Scene one.", generation: { type: "STOCK" } },
-          { narration: "Scene two.", generation: { type: "STOCK" } },
-        ],
+        scenes: [{ prompt: "Scene one." }, { prompt: "Scene two." }],
       },
       { longRunning: true },
     );
@@ -781,7 +882,10 @@ export async function runFullCoverage({
 
       await call("remix_project", {
         projectId: ctx.projectId,
-        remixActions: [{ type: "ENABLE_CAPTIONS" }, { type: "SET_BACKGROUND_MUSIC" }],
+        remixActions: [
+          { type: "ENABLE_CAPTIONS" },
+          { type: "SET_BACKGROUND_MUSIC", fileId: null },
+        ],
       });
     },
     { sampleable: true },

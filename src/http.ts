@@ -20,12 +20,17 @@ import {
 } from "./mcpRequestLog";
 import type { McpOAuthContext } from "./operations";
 import {
+  MCP_CHATGPT_PATH,
   MCP_PATH,
+  OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH,
   OAUTH_PROTECTED_RESOURCE_MCP_PATH,
   OAUTH_PROTECTED_RESOURCE_PATH,
+  type McpAuthChallengeMode,
   buildProtectedResourceMetadata,
+  buildResourceMetadataUrl,
   buildWwwAuthenticateChallenge,
 } from "./oauthProtectedResource";
+import { getCallsProtectedTool } from "./protectedToolAuth";
 import { mirrorSecuritySchemesToTopLevel } from "./securitySchemes";
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -187,7 +192,17 @@ function readJsonBody(req: IncomingMessage): Promise<ReadBodyResult> {
   });
 }
 
-async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleMcpPost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  {
+    mcpPath,
+    authChallengeMode,
+  }: {
+    mcpPath: string;
+    authChallengeMode: McpAuthChallengeMode;
+  },
+): Promise<void> {
   const bodyResult = await readJsonBody(req);
 
   if (!bodyResult.ok) {
@@ -203,32 +218,65 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
   const token = extractBearerToken(req);
   const mcpMethod = getMcpMethodFromBody(bodyResult.body);
   const hasAuthorization = token != null;
+  const origin = getRequestOrigin(req);
 
-  // In OAuth mode (an issuer is configured) we DON'T reject unauthenticated
-  // requests at the transport. Discovery (`initialize` / `tools/list`) must be
-  // served without a token so a host like ChatGPT can enumerate and render the
-  // tools, and a tool INVOCATION without credentials must reach the handler so it
-  // can return the RFC 9728 challenge on the tool RESULT
-  // (`_meta["mcp/www_authenticate"]`) — the piece ChatGPT keys off to launch its
-  // sign-in flow (see `createMcpOperations`). A transport-level HTTP 401 short of
-  // that leaves ChatGPT seeing no tools and never prompting for login.
-  //
-  // In API-key-only mode (no issuer) there is no OAuth flow to run, so we keep
-  // the transport-level `WWW-Authenticate` challenge for a missing token.
+  // In API-key-only mode (no issuer) there is no OAuth flow to run, so every
+  // credential-less request gets a transport-level `WWW-Authenticate` challenge.
   if (token == null && config.oauthIssuer == null) {
     res.setHeader(
       "WWW-Authenticate",
       buildWwwAuthenticateChallenge({
-        origin: getRequestOrigin(req),
+        origin,
         oauthIssuer: config.oauthIssuer,
+        resourcePath: mcpPath,
       }),
     );
     writeJsonRpcError(
       res,
       401,
       -32001,
-      "Missing VideoGen credentials. Send an API key (create one at https://app.videogen.io/developers) or an OAuth access token as an 'Authorization: Bearer <token>' header.",
+      "Missing VideoGen credentials. Send an API key (create one at https://app.videogen.io/api) or an OAuth access token as an 'Authorization: Bearer <token>' header.",
     );
+    logMcpRequest({
+      method: mcpMethod,
+      httpStatus: 401,
+      hasAuthorization,
+      authChallengeEmitted: true,
+    });
+
+    return;
+  }
+
+  // Default `/mcp` (HTTP_401): lazy auth for Cursor / Claude. Discovery
+  // (`initialize` / `tools/list`) and `noauth` tools stay anonymous; a protected
+  // `tools/call` without a bearer fails at the transport with `401` +
+  // `WWW-Authenticate` BEFORE the MCP layer. A soft `200` tool-result challenge
+  // is NOT enough for those hosts — they treat it as a normal tool error and
+  // never attach the OAuth token.
+  //
+  // `/mcp/chatgpt` (TOOL_RESULT): ChatGPT Apps do not re-trigger OAuth from a
+  // transport `401` on `tools/call`. They need the tool-result
+  // `_meta["mcp/www_authenticate"]` challenge from `createMcpOperations`, so
+  // credential-less protected calls must reach the handler.
+  if (
+    token == null &&
+    config.oauthIssuer != null &&
+    authChallengeMode === "HTTP_401" &&
+    getCallsProtectedTool(bodyResult.body)
+  ) {
+    res.setHeader(
+      "WWW-Authenticate",
+      buildWwwAuthenticateChallenge({
+        origin,
+        oauthIssuer: config.oauthIssuer,
+        resourcePath: mcpPath,
+        includeInvalidToken: true,
+      }),
+    );
+    writeJson(res, 401, {
+      error: "invalid_token",
+      error_description: "Sign in to VideoGen to continue",
+    });
     logMcpRequest({
       method: mcpMethod,
       httpStatus: 401,
@@ -263,11 +311,11 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
   // When an issuer is configured the caller may present an OAuth access token, so
   // bind the server to this request's OAuth context: upstream 401s then surface a
   // re-authentication challenge (`_meta["mcp/www_authenticate"]`) pointing at the
-  // protected-resource metadata for the origin the client actually reached us on.
+  // protected-resource metadata for the origin + MCP path the client reached.
   const oauthContext: McpOAuthContext | null =
     config.oauthIssuer != null
       ? {
-          resourceMetadataUrl: `${getRequestOrigin(req)}${OAUTH_PROTECTED_RESOURCE_PATH}`,
+          resourceMetadataUrl: buildResourceMetadataUrl({ origin, resourcePath: mcpPath }),
           scopes: OAUTH_SCOPES,
         }
       : null;
@@ -417,6 +465,7 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       version: SERVER_VERSION,
       transport: "streamable-http",
       endpoint: MCP_PATH,
+      chatgptEndpoint: MCP_CHATGPT_PATH,
       docs: "https://docs.videogen.io",
     });
 
@@ -425,12 +474,16 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
 
   if (
     (pathname === OAUTH_PROTECTED_RESOURCE_PATH ||
-      pathname === OAUTH_PROTECTED_RESOURCE_MCP_PATH) &&
+      pathname === OAUTH_PROTECTED_RESOURCE_MCP_PATH ||
+      pathname === OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH) &&
     method === "GET"
   ) {
+    const resourcePath =
+      pathname === OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH ? MCP_CHATGPT_PATH : MCP_PATH;
     const metadata = buildProtectedResourceMetadata({
       origin: getRequestOrigin(req),
       oauthIssuer: config.oauthIssuer,
+      resourcePath,
     });
 
     if (metadata == null) {
@@ -444,9 +497,12 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
-  if (pathname === MCP_PATH) {
+  if (pathname === MCP_PATH || pathname === MCP_CHATGPT_PATH) {
+    const authChallengeMode: McpAuthChallengeMode =
+      pathname === MCP_CHATGPT_PATH ? "TOOL_RESULT" : "HTTP_401";
+
     if (method === "POST") {
-      handleMcpPost(req, res).catch((err: unknown) => {
+      handleMcpPost(req, res, { mcpPath: pathname, authChallengeMode }).catch((err: unknown) => {
         logServerError("Unhandled error in MCP POST handler.", err);
 
         if (!res.headersSent) {
@@ -482,6 +538,6 @@ applyServerProxyKeepAliveTimeouts({ server: httpServer });
 
 httpServer.listen(config.port, () => {
   process.stdout.write(
-    `[videogen-mcp] Remote MCP server listening on port ${config.port} (endpoint ${MCP_PATH}).\n`,
+    `[videogen-mcp] Remote MCP server listening on port ${config.port} (endpoint ${MCP_PATH}; ChatGPT ${MCP_CHATGPT_PATH}).\n`,
   );
 });
