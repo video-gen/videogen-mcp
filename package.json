@@ -1,6 +1,6 @@
 {
   "name": "@videogen/mcp",
-  "version": "2.0.12",
+  "version": "2.0.13",
   "description": "Model Context Protocol server for the VideoGen API. Generate videos, images, voiceovers, and more from any MCP client.",
   "license": "MIT",
   "type": "module",
@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@videogen/sdk": "^2.0.12",
+    "@videogen/sdk": "^2.0.13",
     "zod": "^4.3.6"
   },
   "devDependencies": {
