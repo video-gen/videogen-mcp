@@ -14,6 +14,25 @@ export function getMcpMethodFromBody(body: unknown): string | null {
   return parsed.success ? parsed.data.method : null;
 }
 
+const toolsCallParamsSchema = z.object({
+  name: z.string(),
+});
+
+const toolsCallBodySchema = z.object({
+  method: z.literal("tools/call"),
+  params: toolsCallParamsSchema,
+});
+
+/**
+ * Extracts the tool name from a `tools/call` JSON-RPC request body.
+ * Returns null for other methods or malformed bodies — never throws.
+ */
+export function getToolNameFromCallBody(body: unknown): string | null {
+  const parsed = toolsCallBodySchema.safeParse(body);
+
+  return parsed.success ? parsed.data.params.name : null;
+}
+
 const toolsListResultSchema = z.object({
   tools: z.array(z.object({ name: z.string() })),
 });

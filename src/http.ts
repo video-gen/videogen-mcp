@@ -15,6 +15,7 @@ import {
 import {
   getHasToolAuthChallenge,
   getMcpMethodFromBody,
+  getToolNameFromCallBody,
   getToolNamesFromListResult,
   logMcpRequest,
 } from "./mcpRequestLog";
@@ -22,15 +23,18 @@ import type { McpOAuthContext } from "./operations";
 import {
   MCP_CHATGPT_PATH,
   MCP_PATH,
+  OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
   OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH,
   OAUTH_PROTECTED_RESOURCE_MCP_PATH,
   OAUTH_PROTECTED_RESOURCE_PATH,
+  OPENID_CONFIGURATION_PATH,
   type McpAuthChallengeMode,
+  buildAuthorizationServerMetadata,
   buildProtectedResourceMetadata,
   buildResourceMetadataUrl,
   buildWwwAuthenticateChallenge,
 } from "./oauthProtectedResource";
-import { getCallsProtectedTool } from "./protectedToolAuth";
+import { resolveMcpUpstreamClientId } from "./resolveMcpUpstreamClientId";
 import { mirrorSecuritySchemesToTopLevel } from "./securitySchemes";
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -220,9 +224,18 @@ async function handleMcpPost(
   const hasAuthorization = token != null;
   const origin = getRequestOrigin(req);
 
-  // In API-key-only mode (no issuer) there is no OAuth flow to run, so every
-  // credential-less request gets a transport-level `WWW-Authenticate` challenge.
-  if (token == null && config.oauthIssuer == null) {
+  // The standard `/mcp` endpoint is a protected resource: challenge every
+  // credential-less request, including initialize and discovery, so conforming
+  // hosts start OAuth before treating the server as connected. ChatGPT Apps use
+  // `/mcp/chatgpt` because they require anonymous discovery and a soft
+  // tool-result challenge when a protected tool is invoked.
+  //
+  // API-key-only deployments have no OAuth issuer, so every credential-less
+  // request is also rejected here with a plain Bearer challenge.
+  if (
+    token == null &&
+    (config.oauthIssuer == null || authChallengeMode === "HTTP_401")
+  ) {
     res.setHeader(
       "WWW-Authenticate",
       buildWwwAuthenticateChallenge({
@@ -247,55 +260,18 @@ async function handleMcpPost(
     return;
   }
 
-  // Default `/mcp` (HTTP_401): lazy auth for Cursor / Claude. Discovery
-  // (`initialize` / `tools/list`) and `noauth` tools stay anonymous; a protected
-  // `tools/call` without a bearer fails at the transport with `401` +
-  // `WWW-Authenticate` BEFORE the MCP layer. A soft `200` tool-result challenge
-  // is NOT enough for those hosts — they treat it as a normal tool error and
-  // never attach the OAuth token.
-  //
-  // `/mcp/chatgpt` (TOOL_RESULT): ChatGPT Apps do not re-trigger OAuth from a
-  // transport `401` on `tools/call`. They need the tool-result
-  // `_meta["mcp/www_authenticate"]` challenge from `createMcpOperations`, so
-  // credential-less protected calls must reach the handler.
-  if (
-    token == null &&
-    config.oauthIssuer != null &&
-    authChallengeMode === "HTTP_401" &&
-    getCallsProtectedTool(bodyResult.body)
-  ) {
-    res.setHeader(
-      "WWW-Authenticate",
-      buildWwwAuthenticateChallenge({
-        origin,
-        oauthIssuer: config.oauthIssuer,
-        resourcePath: mcpPath,
-        includeInvalidToken: true,
-      }),
-    );
-    writeJson(res, 401, {
-      error: "invalid_token",
-      error_description: "Sign in to VideoGen to continue",
-    });
-    logMcpRequest({
-      method: mcpMethod,
-      httpStatus: 401,
-      hasAuthorization,
-      authChallengeEmitted: true,
-    });
-
-    return;
-  }
-
   // The SDK client is built lazily — only when a tool actually performs an API
-  // call. Discovery (`initialize` / `tools/list`) never runs a tool handler, so
-  // an anonymous caller (no token) never triggers construction and the SDK
-  // constructor's mandatory-key check never fires; that is what lets the
-  // OAuth-enabled server serve `tools/list` without a credential. A
-  // credential-less tool INVOCATION is short-circuited by `createMcpOperations`
-  // (the OAuth sign-in challenge) before `getClient` is reached, so the client is
-  // only ever constructed once a request is genuinely about to hit the API.
+  // call. On `/mcp/chatgpt`, discovery never runs a tool handler, so an
+  // anonymous caller never triggers construction. A credential-less protected
+  // tool invocation is short-circuited by `createMcpOperations` before
+  // `getClient` is reached. The standard `/mcp` path has already required a
+  // bearer above.
   // Memoized so a multi-step tool call (start + polls) reuses one client.
+  const upstreamClientId = resolveMcpUpstreamClientId({
+    mcpPath,
+    requestUrl: req.url ?? mcpPath,
+    requestHeaders: req.headers,
+  });
   let requestClient: VideoGen | null = null;
   const getClient = (): VideoGen => {
     // `token` is the caller's raw bearer credential — an OAuth access token for
@@ -303,6 +279,9 @@ async function handleMcpPost(
     requestClient ??= createVideoGenClientFromToken({
       bearerToken: token ?? "",
       baseUrl: config.baseUrl,
+      // Prefer host-stamped `X-VideoGen-Client` / `?vg_client=` so Integrations
+      // cards (Cursor, Raycast, …) light up; ChatGPT path always forces chatgpt.
+      clientId: upstreamClientId,
     });
 
     return requestClient;
@@ -331,6 +310,9 @@ async function handleMcpPost(
     oauthContext,
     abortController.signal,
     token != null,
+    // `/mcp/chatgpt` is the Plugins / ChatGPT Apps surface (no commerce deep
+    // links). `/mcp` and every other path keep STANDARD upgrade/top-ups help.
+    mcpPath === MCP_CHATGPT_PATH ? "CHATGPT_APP" : "STANDARD",
   );
 
   // Stateless: a fresh server + transport per request, since each request may
@@ -346,6 +328,10 @@ async function handleMcpPost(
   // `mirrorSecuritySchemesToTopLevel`. Also capture tool names for discovery
   // logs without logging result bodies or secrets.
   let listedToolNames: string[] | null = null;
+  const calledToolName = getToolNameFromCallBody(bodyResult.body);
+  if (calledToolName != null) {
+    listedToolNames = [calledToolName];
+  }
   let toolAuthChallengeEmitted = false;
   const originalSend = transport.send.bind(transport);
   transport.send = (message, options) => {
@@ -493,6 +479,32 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     }
 
     writeJson(res, 200, metadata);
+
+    return;
+  }
+
+  // Pathless AS metadata for the `/mcp` PRM's `{origin}` authorization server.
+  // Required so Cursor (which strips path issuers) can complete token exchange
+  // after the loopback redirect. See `buildAuthorizationServerMetadata`.
+  if (
+    (pathname === OAUTH_AUTHORIZATION_SERVER_METADATA_PATH ||
+      pathname === OPENID_CONFIGURATION_PATH) &&
+    method === "GET"
+  ) {
+    if (config.oauthIssuer == null) {
+      writeJsonRpcError(res, 404, -32601, "Not found.");
+
+      return;
+    }
+
+    writeJson(
+      res,
+      200,
+      buildAuthorizationServerMetadata({
+        origin: getRequestOrigin(req),
+        oauthIssuer: config.oauthIssuer,
+      }),
+    );
 
     return;
   }

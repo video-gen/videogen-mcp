@@ -1,11 +1,12 @@
 /**
- * Prints the HOSTED tool surface — every descriptor `tools/list` returns to a
- * remote host such as ChatGPT — as JSON on stdout.
+ * Prints the HOSTED ChatGPT Apps tool surface — every descriptor `tools/list`
+ * returns on `/mcp/chatgpt` — as JSON on stdout.
  *
  * Release tooling only: `api/scripts/publish-chatgpt-app.ts` spawns this to
  * detect whether the tool surface changed since the ChatGPT app was last
  * updated by hand. It is deliberately NOT a tsup entry, so it never ships in
- * `dist` or on npm.
+ * `dist` or on npm. Uses `CHATGPT_APP` host surface so commerce deep-link
+ * actions stay out of the recorded Plugins directory submission.
  *
  * Run: pnpm exec tsx mcp/src/toolSurface.ts
  */
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
     null,
     null,
     true,
+    "CHATGPT_APP",
   );
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

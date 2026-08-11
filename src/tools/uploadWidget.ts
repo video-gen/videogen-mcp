@@ -8,6 +8,7 @@ import {
 } from "../appWidget";
 import { openUploaderInputSchema } from "../inputSchemas";
 import { openUploaderOutputSchema } from "../outputSchemas";
+import { WRITE_PRIVATE_TOOL_ANNOTATIONS } from "../toolAnnotations";
 
 /**
  * Registers the ChatGPT App upload widget: an MCP UI resource (the widget HTML)
@@ -55,6 +56,7 @@ export function registerUploadWidget(server: McpServer): void {
         "Open an in-chat file uploader (ChatGPT only). The user picks a file, it is uploaded to VideoGen, and its file id (vg_file_...) is reported back for use in voiceover_to_video, slideshow_to_video, logos, or B-roll. Prefer this over asking the user to paste a link. On clients without in-chat UI, use upload_file (small files) or create_file_upload (large files) instead.",
       inputSchema: openUploaderInputSchema,
       outputSchema: openUploaderOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       _meta: {
         // The render tool links to the widget resource. `openai/outputTemplate`
         // is ChatGPT's compatibility alias for the MCP Apps standard

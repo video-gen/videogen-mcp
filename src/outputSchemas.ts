@@ -150,19 +150,6 @@ const workflowRunSchema = z
   .passthrough()
   .describe("Workflow run status snapshot.");
 
-const avatarPresenterSchema = z
-  .object({
-    avatarPresenterId: z.string().describe("Presenter id (vg_pres_...)."),
-    displayableGender: z
-      .enum(["MALE", "FEMALE", "NEUTRAL"])
-      .describe("Presenter gender."),
-    imageUrl: z.string().describe("Still image URL."),
-    thumbnailUrl: z.string().describe("Thumbnail image URL."),
-    previewVideoUrl: z.string().describe("Short preview clip URL."),
-  })
-  .passthrough()
-  .describe("An avatar presenter available for generation.");
-
 const ttsVoiceSchema = z
   .object({
     voiceId: z.string().describe("Voice id (vg_voic_...)."),
@@ -389,17 +376,6 @@ export const listFilesOutputSchema = z
   .passthrough()
   .describe("Paginated list of files.");
 
-export const listAvatarPresentersOutputSchema = z
-  .object({
-    avatarPresenters: z
-      .array(avatarPresenterSchema)
-      .describe("Available avatar presenters."),
-    hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
-  })
-  .passthrough()
-  .describe("Paginated list of avatar presenters.");
-
 export const listTtsVoicesOutputSchema = z
   .object({
     ttsVoices: z.array(ttsVoiceSchema).describe("Available text-to-speech voices."),
@@ -416,12 +392,75 @@ export const listLanguagesOutputSchema = z
   .passthrough()
   .describe("Supported narration and caption languages.");
 
+const entityReferenceSchema = z
+  .object({
+    fileId: z.string().describe("Reference image file id (vg_file_...)."),
+    description: z.string().describe("Reference description (empty when unset)."),
+    isDefault: z.boolean().describe("True when this is the primary/thumbnail reference."),
+  })
+  .passthrough()
+  .describe("An image reference attached to an entity.");
+
+const entityActorConfigSchema = z
+  .object({
+    voiceDisplayName: z.string().nullish().describe("Configured voice display name when set."),
+    hasVoice: z.boolean().describe("True when the actor has a configured voice."),
+    hasAvatarPresenter: z
+      .boolean()
+      .describe("True when the actor has an image reference usable for avatar generation."),
+  })
+  .passthrough()
+  .nullable()
+  .describe("Voice/avatar summary for ACTOR entities; null for other types.");
+
+const entitySchema = z
+  .object({
+    entityId: z.string().describe("Entity id (vg_enti_...)."),
+    entityType: z
+      .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE"])
+      .describe("ACTOR, PRODUCT, or VISUAL_STYLE."),
+    name: z.string().describe("Display name."),
+    description: z.string().describe("Description (empty when unset)."),
+    actorConfig: entityActorConfigSchema.optional(),
+    references: z.array(entityReferenceSchema).describe("Attached reference images."),
+    createdAt: z.number().describe("Unix created-at timestamp."),
+    updatedAt: z.number().describe("Unix updated-at timestamp."),
+  })
+  .passthrough()
+  .describe("A reusable actor, product, or visual style entity.");
+
+export const entityOutputSchema = entitySchema;
+
+export const listEntitiesOutputSchema = z
+  .object({
+    entities: z.array(entitySchema).describe("Entities visible to the API key."),
+    hasMore: z.boolean().describe("Whether another page is available."),
+    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+  })
+  .passthrough()
+  .describe("Paginated list of entities.");
+
+export const entityArchiveOutputSchema = z
+  .object({
+    entityId: z.string().describe("Archived entity id."),
+    archived: z.boolean().describe("Always true on success."),
+  })
+  .passthrough()
+  .describe("Entity archive confirmation.");
+
 export const openUploaderOutputSchema = z
   .object({
     status: z.string().describe("Widget status (ready when the uploader UI can open)."),
   })
   .passthrough()
   .describe("ChatGPT App upload-widget launch result.");
+
+export const guidanceDocumentOutputSchema = z
+  .object({
+    markdown: z.string().describe("Full guidance document in markdown."),
+  })
+  .passthrough()
+  .describe("Operational guidance document for agents.");
 
 export const getAppDeepLinkOutputSchema = z
   .object({

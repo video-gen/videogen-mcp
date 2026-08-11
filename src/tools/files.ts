@@ -26,6 +26,10 @@ import {
   listFilesOutputSchema,
 } from "../outputSchemas";
 import { errorResult } from "../result";
+import {
+  READ_ONLY_TOOL_ANNOTATIONS,
+  WRITE_PRIVATE_TOOL_ANNOTATIONS,
+} from "../toolAnnotations";
 
 /**
  * Upper bound on the decoded size of an inline (base64) upload on the HOSTED
@@ -104,6 +108,7 @@ export function registerFileTools(
           "Upload a local file to VideoGen and wait until it is processed. Returns the file with its id (vg_file_...) and signed URLs. Use the returned fileId for voiceover_to_video, slideshow_to_video, logos, or B-roll. To upload a remote asset, download it first and pass its local path.",
         inputSchema: uploadFileLocalInputSchema,
         outputSchema: fileOutputSchema,
+        annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
         ...mediaPreviewToolFields,
       },
       async (args) => {
@@ -154,6 +159,7 @@ export function registerFileTools(
           "Upload a small file (image, logo, or short audio) to VideoGen by passing its base64-encoded contents, and wait until it is processed. Returns the file with its id (vg_file_...) and signed URLs. Use the returned fileId for voiceover_to_video, slideshow_to_video, logos, or B-roll. For large files, use create_file_upload instead.",
         inputSchema: uploadFileHostedInputSchema,
         outputSchema: fileOutputSchema,
+        annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
         ...mediaPreviewToolFields,
       },
       async (args) => {
@@ -194,6 +200,7 @@ export function registerFileTools(
         "Start an upload for a large file, or when file bytes cannot be inlined. Returns { fileId, uploadUrl }. PUT the raw file bytes to uploadUrl with NO Authorization header (it is a short-lived pre-signed URL). Then call get_file with { fileId, wait: true } to wait until processing finishes, and pass the returned fileId to workflows, tools, logos, or B-roll. For small files, prefer upload_file.",
       inputSchema: createFileUploadInputSchema,
       outputSchema: fileUploadOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) =>
       await respondSdk(() =>
@@ -215,6 +222,7 @@ export function registerFileTools(
         "Fetch a file by id with freshly hydrated (non-expired) signed URLs for its thumbnail, preview, and download renditions. Set wait: true to poll until the file finishes processing — use this right after PUTting bytes to a create_file_upload URL.",
       inputSchema: getFileInputSchema,
       outputSchema: fileOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
     async (args) => {
@@ -243,6 +251,7 @@ export function registerFileTools(
       description: "List files visible to the current API key.",
       inputSchema: listFilesInputSchema,
       outputSchema: listFilesOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (args) => await respondSdk(() => getClient().files.getFiles(dropUndefined(args))),
   );

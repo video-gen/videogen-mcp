@@ -13,8 +13,8 @@ import { z } from "zod";
 /**
  * Boots `dist/http.js` over Streamable HTTP and asserts host-critical discovery
  * / auth behavior:
- *   - OAuth mode: anonymous initialize / tools/list succeed with schemes
- *   - Default `/mcp`: protected tools/call without Bearer → HTTP 401
+ *   - Default `/mcp`: every request without Bearer → HTTP 401
+ *   - `/mcp/chatgpt`: anonymous initialize / tools/list succeed with schemes
  *   - `/mcp/chatgpt`: protected tools/call without Bearer → soft tool challenge
  *   - API-key mode: missing Bearer → HTTP 401 + WWW-Authenticate
  *
@@ -188,24 +188,41 @@ async function postMcpJsonRpc({
   return { status: response.status, wwwAuthenticate, payload };
 }
 
-void test("OAuth mode serves anonymous initialize + tools/list with correct securitySchemes", async () => {
-  const { child, mcpUrl, origin } = await startHttpServer({
+void test("/mcp/chatgpt serves anonymous initialize + tools/list with correct securitySchemes", async () => {
+  const { child, origin } = await startHttpServer({
     VIDEOGEN_OAUTH_ISSUER: OAUTH_ISSUER,
   });
 
   try {
-    const prmResponse = await fetch(`${origin}/.well-known/oauth-protected-resource`);
+    const chatgptUrl = `${origin}/mcp/chatgpt`;
+    const prmResponse = await fetch(
+      `${origin}/.well-known/oauth-protected-resource/mcp/chatgpt`,
+    );
     assert.equal(prmResponse.status, 200);
     const prmBody: unknown = await prmResponse.json();
     assert.ok(prmBody != null && typeof prmBody === "object");
-    assert.equal("resource" in prmBody ? prmBody.resource : null, mcpUrl);
+    assert.equal("resource" in prmBody ? prmBody.resource : null, chatgptUrl);
     assert.deepEqual(
       "authorization_servers" in prmBody ? prmBody.authorization_servers : null,
       [OAUTH_ISSUER],
     );
 
+    const asResponse = await fetch(`${origin}/.well-known/oauth-authorization-server`);
+    assert.equal(asResponse.status, 200);
+    const asBody: unknown = await asResponse.json();
+    assert.ok(asBody != null && typeof asBody === "object");
+    assert.equal("issuer" in asBody ? asBody.issuer : null, origin);
+    assert.equal(
+      "authorization_endpoint" in asBody ? asBody.authorization_endpoint : null,
+      `${OAUTH_ISSUER}/oauth/authorize`,
+    );
+    assert.equal(
+      "token_endpoint" in asBody ? asBody.token_endpoint : null,
+      `${OAUTH_ISSUER}/oauth/token`,
+    );
+
     const initialize = await postMcpJsonRpc({
-      mcpUrl,
+      mcpUrl: chatgptUrl,
       body: {
         jsonrpc: "2.0",
         id: 1,
@@ -228,7 +245,7 @@ void test("OAuth mode serves anonymous initialize + tools/list with correct secu
     const client = new Client({ name: "http-discovery-test", version: "1.0.0" });
 
     try {
-      const transport = new StreamableHTTPClientTransport(new URL(mcpUrl));
+      const transport = new StreamableHTTPClientTransport(new URL(chatgptUrl));
       await client.connect(transport as Transport);
 
       const { tools } = await client.listTools();
@@ -251,6 +268,45 @@ void test("OAuth mode serves anonymous initialize + tools/list with correct secu
       assert.deepEqual(getMeSchemes.data, [{ type: "oauth2", scopes: ["email", "profile"] }]);
     } finally {
       await client.close().catch(() => undefined);
+    }
+  } finally {
+    stopHttpServer(child);
+  }
+});
+
+void test("default /mcp requires OAuth before initialize or tools/list", async () => {
+  const { child, mcpUrl } = await startHttpServer({
+    VIDEOGEN_OAUTH_ISSUER: OAUTH_ISSUER,
+  });
+
+  try {
+    const initialize = await postMcpJsonRpc({
+      mcpUrl,
+      body: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: { name: "http-discovery-test", version: "0" },
+        },
+      },
+    });
+    const toolsList = await postMcpJsonRpc({
+      mcpUrl,
+      body: {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/list",
+      },
+    });
+
+    for (const result of [initialize, toolsList]) {
+      assert.equal(result.status, 401);
+      assert.ok(result.wwwAuthenticate != null);
+      assert.match(result.wwwAuthenticate, /^Bearer /);
+      assert.ok(result.wwwAuthenticate.includes("resource_metadata="));
     }
   } finally {
     stopHttpServer(child);
@@ -308,19 +364,18 @@ void test("default /mcp returns HTTP 401 for protected tools/call without Bearer
     assert.ok(result.wwwAuthenticate != null);
     assert.match(result.wwwAuthenticate, /^Bearer /);
     assert.ok(result.wwwAuthenticate.includes("resource_metadata="));
-    assert.ok(result.wwwAuthenticate.includes('error="invalid_token"'));
   } finally {
     stopHttpServer(child);
   }
 });
 
-void test("default /mcp still allows anonymous noauth tools/call", async () => {
+void test("default /mcp requires OAuth even for noauth tools/call", async () => {
   const { child, mcpUrl } = await startHttpServer({
     VIDEOGEN_OAUTH_ISSUER: OAUTH_ISSUER,
   });
 
   try {
-    const result = await postMcpJsonRpc({
+    const openUploaderResult = await postMcpJsonRpc({
       mcpUrl,
       body: {
         jsonrpc: "2.0",
@@ -330,8 +385,21 @@ void test("default /mcp still allows anonymous noauth tools/call", async () => {
       },
     });
 
-    assert.equal(result.status, 200);
-    assert.equal(result.wwwAuthenticate, null);
+    assert.equal(openUploaderResult.status, 401);
+    assert.ok(openUploaderResult.wwwAuthenticate != null);
+
+    const guidanceResult = await postMcpJsonRpc({
+      mcpUrl,
+      body: {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: { name: "get_getting_started_guidance", arguments: {} },
+      },
+    });
+
+    assert.equal(guidanceResult.status, 401);
+    assert.ok(guidanceResult.wwwAuthenticate != null);
   } finally {
     stopHttpServer(child);
   }
@@ -352,6 +420,12 @@ void test("/mcp/chatgpt returns a soft tool-result challenge (not HTTP 401) for 
     assert.equal(
       "resource" in chatgptPrmBody ? chatgptPrmBody.resource : null,
       `${origin}/mcp/chatgpt`,
+    );
+    assert.deepEqual(
+      "authorization_servers" in chatgptPrmBody
+        ? chatgptPrmBody.authorization_servers
+        : null,
+      [OAUTH_ISSUER],
     );
 
     const result = await postMcpJsonRpc({

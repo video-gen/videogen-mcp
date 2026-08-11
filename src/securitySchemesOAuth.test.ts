@@ -5,6 +5,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
 import { buildMcpServer } from "./buildServer";
 import { createVideoGenClientFromToken } from "./client";
+import { GUIDANCE_DOCUMENTS } from "./guidance/documents";
 import type { McpOAuthContext } from "./operations";
 import { mirrorSecuritySchemesToTopLevel } from "./securitySchemes";
 
@@ -52,7 +53,7 @@ async function listToolsWithOAuth(): Promise<{
   }
 }
 
-void test("OAuth-enabled HOSTED tools advertise oauth2 except open_uploader and get_app_deep_link (noauth)", async () => {
+void test("OAuth-enabled HOSTED tools advertise oauth2 except noauth tools", async () => {
   const { tools } = await listToolsWithOAuth();
 
   const openUploader = tools.find((tool) => tool.name === "open_uploader");
@@ -75,6 +76,14 @@ void test("OAuth-enabled HOSTED tools advertise oauth2 except open_uploader and 
   assert.deepEqual(openUploaderSchemes.data, [{ type: "noauth" }]);
   assert.deepEqual(getAppDeepLinkSchemes.data, [{ type: "noauth" }]);
   assert.deepEqual(getMeSchemes.data, [{ type: "oauth2", scopes: ["email", "profile"] }]);
+
+  for (const doc of GUIDANCE_DOCUMENTS) {
+    const guidanceTool = tools.find((tool) => tool.name === doc.toolName);
+    assert.ok(guidanceTool != null, `missing guidance tool ${doc.toolName}`);
+    const schemes = securitySchemesSchema.safeParse(guidanceTool._meta?.securitySchemes);
+    assert.ok(schemes.success, `${doc.toolName} must advertise securitySchemes`);
+    assert.deepEqual(schemes.data, [{ type: "noauth" }]);
+  }
 });
 
 void test("mirrorSecuritySchemesToTopLevel promotes open_uploader noauth and get_me oauth2", async () => {

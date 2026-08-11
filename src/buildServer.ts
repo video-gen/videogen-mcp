@@ -1,5 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GetVideoGenClient } from "./client";
+import {
+  type McpHostSurface,
+  getServerInstructionsForHostSurface,
+} from "./hostSurface";
 import { type McpOAuthContext, HOSTED_PROXY_SAFE_MAX_WAIT_MS, createMcpOperations } from "./operations";
 import { registerTools } from "./registerTools";
 
@@ -63,22 +67,22 @@ export type McpExecutionMode = "LOCAL" | "HOSTED";
  * Builds a fully-configured MCP server bound to a VideoGen client factory. Both
  * the local stdio entrypoint and the remote HTTP entrypoint use this. The tool
  * surface is nearly identical across transports; `executionMode` gates the few
- * tools that are only safe when the server runs on the caller's own machine. The
+ * tools that are only safe when the server runs on the caller's own machine, and
+ * `hostSurface` gates ChatGPT Apps commerce policy (see `hostSurface.ts`). The
  * HTTP server builds a fresh instance per request because each request
  * authenticates as a different team.
  *
- * `getClient` is called only when a tool actually performs an API call — never
- * during discovery — so the SDK client (and its mandatory key) is constructed
- * lazily. This is what lets the OAuth server serve anonymous `tools/list`
- * without any credential.
+ * `getClient` is called only when a tool actually performs an API call, never
+ * during discovery, so the SDK client and its mandatory credential are
+ * constructed lazily. The ChatGPT endpoint uses this to serve anonymous
+ * `tools/list`; the standard endpoint requires a bearer before discovery.
  *
  * `hasCredentials` is whether the caller presented a bearer token. On an
- * OAuth-enabled server, discovery (`initialize` / `tools/list`) is served
- * unauthenticated so hosts can enumerate tools. On `/mcp/chatgpt`, a tool
- * invocation without credentials short-circuits to the OAuth sign-in challenge
- * on the tool result (see `createMcpOperations`) before `getClient` is ever
- * called. On the default `/mcp` path, protected tools are gated with HTTP 401
- * in `http.ts` instead. Stdio always carries a key, so it passes `true`.
+ * OAuth-enabled `/mcp/chatgpt` server, discovery is served unauthenticated and a
+ * protected tool invocation without credentials short-circuits to the OAuth
+ * sign-in challenge on the tool result (see `createMcpOperations`) before
+ * `getClient` is called. The default `/mcp` path requires credentials for every
+ * request in `http.ts`. Stdio always carries a key, so it passes `true`.
  */
 export function buildMcpServer(
   getClient: GetVideoGenClient,
@@ -86,8 +90,17 @@ export function buildMcpServer(
   oauthContext: McpOAuthContext | null,
   abortSignal: AbortSignal | null,
   hasCredentials: boolean,
+  hostSurface: McpHostSurface = "STANDARD",
 ): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const server = new McpServer(
+    {
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+    },
+    {
+      instructions: getServerInstructionsForHostSurface({ hostSurface }),
+    },
+  );
 
   if (oauthContext != null) {
     advertiseOAuthSecuritySchemes(server, oauthContext.scopes);
@@ -102,7 +115,9 @@ export function buildMcpServer(
       abortSignal,
       hasCredentials,
       executionMode === "HOSTED" ? HOSTED_PROXY_SAFE_MAX_WAIT_MS : null,
+      hostSurface,
     ),
+    hostSurface,
   );
 
   return server;

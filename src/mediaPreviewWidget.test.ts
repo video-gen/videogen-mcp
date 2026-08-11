@@ -84,6 +84,17 @@ void test("HOSTED server registers media preview resource and generate_image out
       ),
       "resourceDomains must allow Cloudflare R2 signed hosts",
     );
+    assert.ok(
+      cspMeta.data["openai/widgetCSP"].redirect_domains.includes("https://app.videogen.io"),
+      "redirect_domains must allow opening the VideoGen Media app URL",
+    );
+    assert.equal(
+      cspMeta.data["openai/widgetCSP"].redirect_domains.some((domain) =>
+        domain.includes("r2.cloudflarestorage.com"),
+      ),
+      false,
+      "redirect_domains must not allow signed R2 URLs (ChatGPT breaks signatures)",
+    );
   } finally {
     await client.close();
   }
@@ -102,16 +113,33 @@ void test("LOCAL server does NOT attach media preview meta to generate_image", a
   }
 });
 
-void test("jsonResult tags media payloads with the preview outputTemplate", () => {
+void test("jsonResult tags media payloads with the preview outputTemplate and appMediaUrl", () => {
   assert.equal(getHasInlineMediaUrls({ status: "running" }), false);
 
   const withUrl = {
     status: "succeeded",
-    results: [{ type: "IMAGE", downloadUrl: "https://storage.googleapis.com/x" }],
+    results: [
+      {
+        type: "IMAGE",
+        fileId: "vg_file_7XoHR4wyGOlFKNmQeINtl7",
+        downloadUrl: "https://storage.googleapis.com/x",
+      },
+    ],
   };
   assert.equal(getHasInlineMediaUrls(withUrl), true);
 
   const result = jsonResult(withUrl);
   assert.equal(result._meta?.["openai/outputTemplate"], MEDIA_PREVIEW_WIDGET_URI);
-  assert.deepEqual(result.structuredContent, withUrl);
+  assert.deepEqual(result.structuredContent, {
+    status: "succeeded",
+    results: [
+      {
+        type: "IMAGE",
+        fileId: "vg_file_7XoHR4wyGOlFKNmQeINtl7",
+        downloadUrl: "https://storage.googleapis.com/x",
+        appMediaUrl:
+          "http://localhost:3000/media?storageFileId=vg_file_7XoHR4wyGOlFKNmQeINtl7",
+      },
+    ],
+  });
 });

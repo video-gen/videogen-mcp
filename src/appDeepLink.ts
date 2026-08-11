@@ -1,4 +1,8 @@
-import { getVideogenEnvironment, type VideogenEnvironment } from "./env";
+import {
+  getVideogenEnvironmentForBaseUrl,
+  readBaseUrl,
+  type VideogenEnvironment,
+} from "./env";
 
 /**
  * MCP-side mirror of `@videogen/base` `assistantDeepLink` URL building.
@@ -35,9 +39,9 @@ const NAVIGATION_DESTINATION_TO_PATH: Record<string, string> = {
   USAGE: "/usage",
   DEVELOPERS: "/api",
   ENTITIES: "/entities",
-  AUTOMATIONS: "/automations",
+  AUTOMATIONS: "/integrations",
   INTEGRATIONS: "/integrations",
-  DONE_FOR_YOU: "/done-for-you",
+  DONE_FOR_YOU: "/creative-services",
 };
 
 const EXTERNAL_NAVIGATION_DESTINATION_TO_URL: Record<string, string> = {
@@ -107,10 +111,11 @@ const truncateFeedbackText = (text: string): string => {
 
 /**
  * Builds an absolute VideoGen app (or public docs) URL for an assistant COMMON
- * deep-link action, using this MCP server's `VIDEOGEN_ENV`.
+ * deep-link action on the app stack corresponding to this MCP server's resolved
+ * API base URL.
  */
 export function buildAppDeepLinkUrl(action: AppDeepLinkAction): string {
-  const environment = getVideogenEnvironment();
+  const environment = getVideogenEnvironmentForBaseUrl({ baseUrl: readBaseUrl() });
   const appBase = getAppBaseUrl(environment);
 
   switch (action.type) {

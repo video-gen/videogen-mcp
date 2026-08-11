@@ -1,5 +1,16 @@
-import { StrictMode, useEffect, useState, type ReactElement } from "react";
+import { StrictMode, useEffect, useRef, useState, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
+import {
+  buildPersistedMediaWidgetState,
+  extractMediaItems,
+  mergeMediaItemsWithPersistedState,
+  readPersistedMediaItems,
+  readStructuredContent,
+  rehydrateMediaItemByFileId,
+  rehydrateMediaItems,
+  resolveToolOutputPayload,
+  type MediaItem,
+} from "./mediaPreviewExtract";
 
 /**
  * ChatGPT App media preview: renders images, videos, and audio from a tool
@@ -9,270 +20,92 @@ import { createRoot } from "react-dom/client";
  * - `ui/notifications/tool-result` (MCP Apps bridge)
  * - `window.openai.toolOutput` + `openai:set_globals` (ChatGPT Apps SDK)
  *
- * Without a host bridge we show a short fallback telling the user to open the
- * download URL.
+ * On refresh ChatGPT often restores toolOutput without signed download URLs.
+ * We persist media rows in `widgetState` and rehydrate missing previews via
+ * `get_file` when a `fileId` is still available.
  */
-
-type MediaKind = "image" | "video" | "audio" | "file";
-
-type MediaItem = {
-  kind: MediaKind;
-  url: string;
-  fileId: string | null;
-  label: string | null;
-};
-
-type OpenAiHost = {
-  toolOutput?: unknown;
-  openExternal?: (args: { href: string }) => void;
-};
-
-declare global {
-  interface Window {
-    openai?: OpenAiHost;
-  }
-}
 
 const ACCENT = "#2563eb";
 const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function readString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function classifyType(fileType: string | null): MediaKind {
-  if (fileType == null) {
-    return "file";
-  }
-
-  const normalized = fileType.toUpperCase();
-
-  if (
-    normalized === "IMAGE" ||
-    normalized.includes("IMAGE") ||
-    normalized === "PNG" ||
-    normalized === "JPEG" ||
-    normalized === "JPG" ||
-    normalized === "WEBP" ||
-    normalized === "GIF" ||
-    normalized === "SVG"
-  ) {
-    return "image";
-  }
-
-  if (normalized === "VIDEO" || normalized.includes("VIDEO") || normalized === "MP4") {
-    return "video";
-  }
-
-  if (
-    normalized === "AUDIO" ||
-    normalized.includes("AUDIO") ||
-    normalized === "MP3" ||
-    normalized === "WAV" ||
-    normalized === "M4A"
-  ) {
-    return "audio";
-  }
-
-  return "file";
-}
-
-function pushMediaItem({
-  items,
-  url,
-  fileId,
-  fileType,
-  label,
-}: {
-  items: MediaItem[];
-  url: string | null;
-  fileId: string | null;
-  fileType: string | null;
-  label: string | null;
-}): void {
-  if (url == null) {
-    return;
-  }
-
-  items.push({
-    kind: classifyType(fileType),
-    url,
-    fileId,
-    label,
-  });
-}
-
-/**
- * Pulls previewable media URLs out of the shapes our MCP tools return:
- * ExecutedTool (`results[]`), FileInfo, and ProjectExport.
- */
-function extractMediaItems(payload: unknown): MediaItem[] {
-  if (!isRecord(payload)) {
-    return [];
-  }
-
-  // Hosts sometimes wrap structuredContent one level deep.
-  if (
-    payload.structuredContent != null &&
-    !Array.isArray(payload.results) &&
-    readString(payload.fileId) == null &&
-    readString(payload.exportId) == null
-  ) {
-    return extractMediaItems(payload.structuredContent);
-  }
-
-  const items: MediaItem[] = [];
-
-  const results = payload.results;
-  if (Array.isArray(results)) {
-    for (const result of results) {
-      if (!isRecord(result)) {
-        continue;
-      }
-
-      const nestedFile = isRecord(result.file) ? result.file : null;
-      const fileType =
-        readString(result.type) ?? (nestedFile != null ? readString(nestedFile.type) : null);
-      const url =
-        readString(result.downloadUrl) ??
-        readString(result.thumbnailUrl) ??
-        (nestedFile != null
-          ? (readString(nestedFile.downloadUrl) ?? readString(nestedFile.thumbnailUrl))
-          : null);
-      const fileId =
-        readString(result.fileId) ?? (nestedFile != null ? readString(nestedFile.fileId) : null);
-
-      pushMediaItem({
-        items,
-        url,
-        fileId,
-        fileType,
-        label: nestedFile != null ? readString(nestedFile.displayName) : null,
-      });
-    }
-  }
-
-  // Bare FileInfo (get_file / upload_file)
-  if (readString(payload.fileId) != null && !Array.isArray(payload.results)) {
-    pushMediaItem({
-      items,
-      url: readString(payload.downloadUrl) ?? readString(payload.thumbnailUrl),
-      fileId: readString(payload.fileId),
-      fileType: readString(payload.type),
-      label: readString(payload.displayName),
-    });
-  }
-
-  // ProjectExport (export_project after wait)
-  if (readString(payload.exportId) != null) {
-    const nestedFile = isRecord(payload.file) ? payload.file : null;
-    pushMediaItem({
-      items,
-      url:
-        readString(payload.downloadUrl) ??
-        readString(payload.thumbnailUrl) ??
-        (nestedFile != null
-          ? (readString(nestedFile.downloadUrl) ?? readString(nestedFile.thumbnailUrl))
-          : null),
-      fileId:
-        readString(payload.exportFileId) ??
-        (nestedFile != null ? readString(nestedFile.fileId) : null),
-      fileType: nestedFile != null ? readString(nestedFile.type) : "VIDEO",
-      label: "Export",
-    });
-  }
-
-  // Dedupe by URL
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.url)) {
-      return false;
-    }
-
-    seen.add(item.url);
-
-    return true;
-  });
-}
-
-function readStructuredContent(message: unknown): unknown {
-  if (!isRecord(message)) {
-    return null;
-  }
-
-  if (message.structuredContent != null) {
-    return message.structuredContent;
-  }
-
-  if (!isRecord(message.params)) {
-    return null;
-  }
-
-  const params = message.params;
-
-  if (params.structuredContent != null) {
-    return params.structuredContent;
-  }
-
-  if (isRecord(params.result) && params.result.structuredContent != null) {
-    return params.result.structuredContent;
-  }
-
-  // Some hosts only put a JSON text content block (no structuredContent).
-  if (Array.isArray(params.content)) {
-    for (const block of params.content) {
-      if (!isRecord(block) || block.type !== "text") {
-        continue;
-      }
-
-      const text = readString(block.text);
-      if (text == null) {
-        continue;
-      }
-
-      try {
-        return JSON.parse(text);
-      } catch {
-        // not JSON
-      }
-    }
-  }
-
-  return null;
-}
-
-function resolveToolOutputPayload(toolOutput: unknown): unknown {
-  if (toolOutput == null) {
-    return null;
-  }
-
-  // ChatGPT documents toolOutput as structuredContent itself, but some hosts
-  // pass the full CallToolResult envelope.
-  if (isRecord(toolOutput) && toolOutput.structuredContent != null) {
-    const nested = extractMediaItems(toolOutput.structuredContent);
-    if (nested.length > 0) {
-      return toolOutput.structuredContent;
-    }
-  }
-
-  return toolOutput;
+function mediaItemReactKey(item: MediaItem, index: number): string {
+  return item.fileId ?? item.previewUrl ?? item.appMediaUrl ?? `media-${index}`;
 }
 
 function MediaPreviewWidget(): ReactElement {
-  const [items, setItems] = useState<MediaItem[]>(() =>
-    extractMediaItems(resolveToolOutputPayload(window.openai?.toolOutput)),
-  );
+  const [items, setItems] = useState<MediaItem[]>(() => {
+    const fromTool = extractMediaItems(resolveToolOutputPayload(window.openai?.toolOutput));
+    const fromState = readPersistedMediaItems(window.openai?.widgetState);
+
+    return mergeMediaItemsWithPersistedState({
+      fromToolOutput: fromTool,
+      fromWidgetState: fromState,
+    });
+  });
+  const [isRehydrating, setIsRehydrating] = useState(false);
+  const rehydrateInFlightRef = useRef(false);
 
   useEffect(() => {
-    const applyPayload = (payload: unknown): void => {
-      const nextItems = extractMediaItems(payload);
-      if (nextItems.length > 0) {
-        setItems(nextItems);
+    let cancelled = false;
+
+    const persistItems = (nextItems: MediaItem[]): void => {
+      if (nextItems.length === 0) {
+        return;
       }
+
+      try {
+        window.openai?.setWidgetState?.(buildPersistedMediaWidgetState(nextItems));
+      } catch {
+        // Persistence is best-effort.
+      }
+    };
+
+    const applyPayload = (payload: unknown): void => {
+      const fromToolOutput = extractMediaItems(payload);
+      const fromWidgetState = readPersistedMediaItems(window.openai?.widgetState);
+      const merged = mergeMediaItemsWithPersistedState({
+        fromToolOutput,
+        fromWidgetState,
+      });
+
+      if (merged.length === 0) {
+        return;
+      }
+
+      setItems(merged);
+      persistItems(merged);
+
+      const needsRehydrate = merged.some(
+        (item) => item.previewUrl == null && item.fileId != null,
+      );
+      if (!needsRehydrate) {
+        return;
+      }
+
+      const callTool = window.openai?.callTool;
+      if (callTool == null || rehydrateInFlightRef.current) {
+        return;
+      }
+
+      rehydrateInFlightRef.current = true;
+      setIsRehydrating(true);
+
+      void (async () => {
+        try {
+          const hydrated = await rehydrateMediaItems({ items: merged, callTool });
+          if (cancelled) {
+            return;
+          }
+
+          setItems(hydrated);
+          persistItems(hydrated);
+        } finally {
+          rehydrateInFlightRef.current = false;
+          if (!cancelled) {
+            setIsRehydrating(false);
+          }
+        }
+      })();
     };
 
     const onMessage = (event: MessageEvent): void => {
@@ -281,15 +114,21 @@ function MediaPreviewWidget(): ReactElement {
       }
 
       const message = event.data;
-      if (!isRecord(message) || message.jsonrpc !== "2.0") {
+      if (
+        typeof message !== "object" ||
+        message == null ||
+        (message as { jsonrpc?: unknown }).jsonrpc !== "2.0"
+      ) {
         return;
       }
 
-      if (message.method !== "ui/notifications/tool-result") {
+      if ((message as { method?: unknown }).method !== "ui/notifications/tool-result") {
         return;
       }
 
-      const payload = readStructuredContent(message) ?? readStructuredContent(message.params);
+      const payload = readStructuredContent(message) ?? readStructuredContent(
+        (message as { params?: unknown }).params,
+      );
       applyPayload(payload);
     };
 
@@ -308,6 +147,7 @@ function MediaPreviewWidget(): ReactElement {
     applyPayload(resolveToolOutputPayload(window.openai?.toolOutput));
 
     return () => {
+      cancelled = true;
       window.removeEventListener("message", onMessage);
       window.removeEventListener(SET_GLOBALS_EVENT_TYPE, onSetGlobals);
     };
@@ -322,6 +162,35 @@ function MediaPreviewWidget(): ReactElement {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const onPreviewLoadError = (fileId: string | null): void => {
+    if (fileId == null || window.openai?.callTool == null || rehydrateInFlightRef.current) {
+      return;
+    }
+
+    const callTool = window.openai.callTool;
+    rehydrateInFlightRef.current = true;
+    setIsRehydrating(true);
+
+    void (async () => {
+      try {
+        const hydrated = await rehydrateMediaItemByFileId({
+          items,
+          fileId,
+          callTool,
+        });
+        setItems(hydrated);
+        try {
+          window.openai?.setWidgetState?.(buildPersistedMediaWidgetState(hydrated));
+        } catch {
+          // best-effort
+        }
+      } finally {
+        rehydrateInFlightRef.current = false;
+        setIsRehydrating(false);
+      }
+    })();
+  };
+
   if (items.length === 0) {
     return (
       <div
@@ -332,8 +201,9 @@ function MediaPreviewWidget(): ReactElement {
           padding: 12,
         }}
       >
-        Media will appear here when a download URL is ready. If generation is still
-        running, wait for it to finish.
+        {isRehydrating
+          ? "Loading media preview…"
+          : "Media will appear here when generation finishes."}
       </div>
     );
   }
@@ -348,9 +218,14 @@ function MediaPreviewWidget(): ReactElement {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      {items.map((item) => (
+      {isRehydrating ? (
+        <div style={{ fontSize: 12, color: "#9ca3af", padding: "0 4px" }}>
+          Refreshing media preview…
+        </div>
+      ) : null}
+      {items.map((item, index) => (
         <div
-          key={item.url}
+          key={mediaItemReactKey(item, index)}
           style={{
             borderRadius: 12,
             overflow: "hidden",
@@ -358,29 +233,46 @@ function MediaPreviewWidget(): ReactElement {
             border: "1px solid #1f2937",
           }}
         >
-          {item.kind === "image" ? (
+          {item.previewUrl != null && item.kind === "image" ? (
             <img
-              src={item.url}
+              src={item.previewUrl}
               alt={item.label ?? "Generated image"}
+              onError={() => {
+                onPreviewLoadError(item.fileId);
+              }}
               style={{ display: "block", width: "100%", height: "auto" }}
             />
           ) : null}
-          {item.kind === "video" ? (
+          {item.previewUrl != null && item.kind === "video" ? (
             <video
-              src={item.url}
+              src={item.previewUrl}
               controls
               playsInline
+              onError={() => {
+                onPreviewLoadError(item.fileId);
+              }}
               style={{ display: "block", width: "100%", height: "auto" }}
             />
           ) : null}
-          {item.kind === "audio" ? (
+          {item.previewUrl != null && item.kind === "audio" ? (
             <div style={{ padding: 12 }}>
-              <audio src={item.url} controls style={{ width: "100%" }} />
+              <audio
+                src={item.previewUrl}
+                controls
+                onError={() => {
+                  onPreviewLoadError(item.fileId);
+                }}
+                style={{ width: "100%" }}
+              />
             </div>
           ) : null}
-          {item.kind === "file" ? (
+          {item.previewUrl == null || item.kind === "file" ? (
             <div style={{ padding: 12, color: "#e5e7eb", fontSize: 14 }}>
-              Preview unavailable for this file type.
+              {item.previewUrl == null
+                ? isRehydrating
+                  ? "Loading preview…"
+                  : "Preview unavailable. Open in VideoGen to view this file."
+                : "Preview unavailable for this file type."}
             </div>
           ) : null}
           <div
@@ -398,23 +290,32 @@ function MediaPreviewWidget(): ReactElement {
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {item.label ?? item.fileId ?? item.kind}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                openUrl(item.url);
-              }}
-              style={{
-                color: ACCENT,
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                flexShrink: 0,
-                fontSize: 12,
-              }}
-            >
-              Open
-            </button>
+            {item.appMediaUrl != null ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const appMediaUrl = item.appMediaUrl;
+                  if (appMediaUrl == null) {
+                    return;
+                  }
+
+                  // Never open signed storage URLs here — ChatGPT appends query
+                  // params and breaks the signature. Open the in-app Media modal.
+                  openUrl(appMediaUrl);
+                }}
+                style={{
+                  color: ACCENT,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  fontSize: 12,
+                }}
+              >
+                Open in VideoGen
+              </button>
+            ) : null}
           </div>
         </div>
       ))}

@@ -1,6 +1,10 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
+  type McpHostSurface,
+  rewriteMcpErrorMessageForHostSurface,
+} from "./hostSurface";
+import {
   authErrorResult,
   errorResult,
   getErrorMessage,
@@ -180,11 +184,12 @@ export type McpOperations = {
  * `hasCredentials` is whether the caller presented a bearer token. On an
  * OAuth-enabled server a tool invocation without credentials short-circuits to
  * the RFC 9728 tool-result challenge BEFORE any upstream call — this is what
- * makes an MCP host (ChatGPT) launch its sign-in flow. It keys off
+ * makes ChatGPT launch its sign-in flow. It keys off
  * `_meta["mcp/www_authenticate"]` on the tool RESULT, not a transport HTTP 401,
- * which is why the hosted server serves discovery unauthenticated and defers the
- * challenge to here. Defaults to `true` for stdio and other callers that always
- * carry a key.
+ * which is why `/mcp/chatgpt` serves discovery unauthenticated and defers the
+ * challenge to here. The standard `/mcp` endpoint requires a bearer before the
+ * MCP layer. Defaults to `true` for stdio and other callers that always carry a
+ * key.
  */
 export function createMcpOperations(
   oauthContext: McpOAuthContext | null,
@@ -195,6 +200,11 @@ export function createMcpOperations(
    * to this ceiling so long-polls cannot outlive the proxy read timeout.
    */
   maxWaitMs?: number | null,
+  /**
+   * ChatGPT Apps rewrite billing-gate errors to account-management copy and never
+   * echo purchase / upgrade / top-ups language. STANDARD leaves API messages as-is.
+   */
+  hostSurface: McpHostSurface = "STANDARD",
 ): McpOperations {
   const resolveWaitTimeoutMs = (requestedTimeoutMs: number | undefined): number => {
     const requestedOrDefault = requestedTimeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -206,7 +216,10 @@ export function createMcpOperations(
     return Math.min(requestedOrDefault, maxWaitMs);
   };
   const toErrorResult = (err: unknown): CallToolResult => {
-    const message = getErrorMessage(err);
+    const message = rewriteMcpErrorMessageForHostSurface({
+      message: getErrorMessage(err),
+      hostSurface,
+    });
 
     // A `401` here means a token reached upstream and was rejected as missing,
     // expired, or revoked. Returning the RFC 9728 challenge is what prompts an
@@ -278,8 +291,9 @@ export function createMcpOperations(
     try {
       const started = await args.start();
       const id = getStartedId(started, args.idKey);
+      const shouldWait = args.controls.wait ?? maxWaitMs == null;
 
-      if (args.controls.wait === false || id == null) {
+      if (!shouldWait || id == null) {
         return jsonResult(started);
       }
 

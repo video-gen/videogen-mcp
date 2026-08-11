@@ -1,0 +1,2 @@
+
+$ tsc --noEmit && tsc -p web/tsconfig.json --noEmit

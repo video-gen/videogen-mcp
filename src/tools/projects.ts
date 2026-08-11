@@ -1,4 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  toExportProjectRequest,
+  toRemixProjectRequest,
+} from "../adapters/projectAdapters";
 import { MEDIA_PREVIEW_TOOL_META } from "../appWidget";
 import type { GetVideoGenClient } from "../client";
 import {
@@ -9,7 +13,7 @@ import {
   listProjectsInputSchema,
   remixProjectInputSchema,
 } from "../inputSchemas";
-import { type McpOperations, dropUndefined, extractControls } from "../operations";
+import { type McpOperations, dropUndefined } from "../operations";
 import {
   exportProjectOutputSchema,
   listProjectsOutputSchema,
@@ -18,6 +22,10 @@ import {
   projectOutputSchema,
   remixProjectOutputSchema,
 } from "../outputSchemas";
+import {
+  READ_ONLY_TOOL_ANNOTATIONS,
+  WRITE_PRIVATE_TOOL_ANNOTATIONS,
+} from "../toolAnnotations";
 
 type MediaPreviewToolMeta = typeof MEDIA_PREVIEW_TOOL_META;
 
@@ -38,6 +46,7 @@ export function registerProjectTools(
         "List projects. API-created projects only by default; pass includeUiProjects to also include dashboard projects.",
       inputSchema: listProjectsInputSchema,
       outputSchema: listProjectsOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (args) => await respondSdk(() => getClient().projects.listProjects(dropUndefined(args))),
   );
@@ -49,6 +58,7 @@ export function registerProjectTools(
       description: "Fetch metadata and the shareable URL for a single project.",
       inputSchema: getProjectInputSchema,
       outputSchema: projectOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (args) =>
       await respondSdk(() => getClient().projects.getProject({ projectId: args.projectId })),
@@ -58,19 +68,23 @@ export function registerProjectTools(
     "export_project",
     {
       title: "Export project",
-      description:
-        "Export a project to an MP4. Starts the export and, by default, waits until the download URL is ready. Pass wait:false and poll with get_project_export when the connection may time out.",
+      description: "Export a project to an MP4 and return its status or download URL.",
       inputSchema: exportProjectInputSchema,
       outputSchema: exportProjectOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
     async (args) => {
-      const { projectId, wait, pollIntervalMs, timeoutMs, ...rest } = args;
+      const { projectId } = args;
       return await runComposite({
-        start: () => getClient().projects.exportProject(dropUndefined({ projectId, ...rest })),
+        start: () =>
+          getClient().projects.exportProject({
+            projectId,
+            ...toExportProjectRequest(args),
+          }),
         poll: (exportId) => getClient().projects.getProjectExport({ projectId, exportId }),
         idKey: "exportId",
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
+        controls: {},
       });
     },
   );
@@ -83,6 +97,7 @@ export function registerProjectTools(
         "Fetch the current status of a project export. Poll until status is succeeded, failed, or cancelled.",
       inputSchema: getProjectExportInputSchema,
       outputSchema: projectExportOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
     async (args) =>
@@ -99,14 +114,18 @@ export function registerProjectTools(
     {
       title: "Remix project",
       description:
-        "Apply remix actions (music, logo, captions, transitions, natural-language edits) to an existing project. Poll with list_project_remix_actions for status.",
+        "Apply curated edits to an existing project. Poll with list_project_remix_actions for status.",
       inputSchema: remixProjectInputSchema,
       outputSchema: remixProjectOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) => {
-      const { projectId, ...body } = args;
+      const { projectId } = args;
       return await respondSdk(() =>
-        getClient().projects.remixProject(dropUndefined({ projectId, ...body })),
+        getClient().projects.remixProject({
+          projectId,
+          ...toRemixProjectRequest(args),
+        }),
       );
     },
   );
@@ -118,6 +137,7 @@ export function registerProjectTools(
       description: "List the status of remix actions applied to a project.",
       inputSchema: listProjectRemixActionsInputSchema,
       outputSchema: listRemixActionsOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (args) =>
       await respondSdk(() =>

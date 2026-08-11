@@ -4,6 +4,7 @@ import {
   formatMcpRequestLogLine,
   getHasToolAuthChallenge,
   getMcpMethodFromBody,
+  getToolNameFromCallBody,
   getToolNamesFromListResult,
 } from "./mcpRequestLog";
 
@@ -12,6 +13,19 @@ void test("getMcpMethodFromBody reads the JSON-RPC method", () => {
   assert.equal(getMcpMethodFromBody({ method: "initialize" }), "initialize");
   assert.equal(getMcpMethodFromBody(null), null);
   assert.equal(getMcpMethodFromBody({ jsonrpc: "2.0", id: 1 }), null);
+});
+
+void test("getToolNameFromCallBody reads tools/call params.name", () => {
+  assert.equal(
+    getToolNameFromCallBody({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "storyboard_to_video", arguments: {} },
+    }),
+    "storyboard_to_video",
+  );
+  assert.equal(getToolNameFromCallBody({ method: "tools/list" }), null);
 });
 
 void test("getToolNamesFromListResult extracts names from a tools/list result", () => {

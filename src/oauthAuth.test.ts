@@ -151,6 +151,27 @@ void test("no credentials on an API-key-only server proceeds (no OAuth flow to r
   assert.equal(getWwwAuthenticate(result._meta), undefined);
 });
 
+void test("hosted composite operations return start ids without polling by default", async () => {
+  const { runComposite } = createMcpOperations(null, null, true, 90_000);
+  let polled = false;
+
+  const result = await runComposite({
+    start: () => Promise.resolve({ toolExecutionId: "vg_tool_123" }),
+    poll: () => {
+      polled = true;
+      return Promise.resolve({ status: "SUCCEEDED" });
+    },
+    idKey: "toolExecutionId",
+    controls: {},
+  });
+
+  assert.equal(polled, false);
+  assert.equal(result.content[0]?.type, "text");
+  if (result.content[0]?.type === "text") {
+    assert.match(result.content[0].text, /vg_tool_123/);
+  }
+});
+
 void test("awaitReady polls until the resource is ready, then returns the snapshot", async () => {
   const { awaitReady } = createMcpOperations(null);
 

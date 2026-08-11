@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { readHttpServerConfig } from "./env";
+import {
+  getVideogenEnvironmentForBaseUrl,
+  readHttpServerConfig,
+} from "./env";
 
 let savedIssuer: string | undefined;
 let savedSupabaseProjectUrl: string | undefined;
@@ -84,4 +87,24 @@ void test("an explicit VIDEOGEN_BASE_URL overrides the per-environment default",
   process.env.VIDEOGEN_BASE_URL = "http://localhost:4010";
 
   assert.equal(readHttpServerConfig().baseUrl, "http://localhost:4010");
+});
+
+void test("getVideogenEnvironmentForBaseUrl identifies hosted stacks without VIDEOGEN_ENV", () => {
+  assert.equal(
+    getVideogenEnvironmentForBaseUrl({
+      baseUrl: "https://prerelease.api.videogen.io/",
+    }),
+    "PRERELEASE",
+  );
+});
+
+void test("getVideogenEnvironmentForBaseUrl keeps custom URLs on the configured environment", () => {
+  process.env.VIDEOGEN_ENV = "DEV";
+
+  assert.equal(
+    getVideogenEnvironmentForBaseUrl({
+      baseUrl: "https://api.example.com",
+    }),
+    "DEV",
+  );
 });

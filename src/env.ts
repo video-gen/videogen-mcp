@@ -10,6 +10,13 @@ const VIDEOGEN_ENVIRONMENTS = [
 
 export type VideogenEnvironment = (typeof VIDEOGEN_ENVIRONMENTS)[number];
 
+const HOSTED_VIDEOGEN_ENVIRONMENTS = [
+  "DEV",
+  "STAGING",
+  "PRERELEASE",
+  "PROD",
+] as const satisfies readonly VideogenEnvironment[];
+
 /**
  * The environment this container was built for, injected as `VIDEOGEN_ENV` at
  * build time (see ci-cd/docker/mcp/Dockerfile). Anything unrecognized — most
@@ -173,14 +180,12 @@ function readOauthIssuer(): string | null {
  * LOCAL (the published npm package, or any run where `VIDEOGEN_ENV` is unset)
  * falls back to the public prod API.
  */
-function readBaseUrl(): string {
-  const baseUrlOverride = process.env.VIDEOGEN_BASE_URL;
-
-  if (baseUrlOverride != null && baseUrlOverride.trim() !== "") {
-    return baseUrlOverride.trim();
-  }
-
-  switch (getVideogenEnvironment()) {
+const getDefaultBaseUrl = ({
+  environment,
+}: {
+  environment: VideogenEnvironment;
+}): string => {
+  switch (environment) {
     case "PROD":
       return "https://api.videogen.io";
     case "PRERELEASE":
@@ -192,4 +197,35 @@ function readBaseUrl(): string {
     case "LOCAL":
       return DEFAULT_BASE_URL;
   }
+};
+
+export function readBaseUrl(): string {
+  const baseUrlOverride = process.env.VIDEOGEN_BASE_URL;
+
+  if (baseUrlOverride != null && baseUrlOverride.trim() !== "") {
+    return baseUrlOverride.trim();
+  }
+
+  return getDefaultBaseUrl({ environment: getVideogenEnvironment() });
+}
+
+/**
+ * Resolves the app environment corresponding to an API base URL. This keeps
+ * deep links on the same hosted stack as API traffic when `VIDEOGEN_ENV` is
+ * absent, while preserving LOCAL for custom/self-hosted URLs.
+ */
+export function getVideogenEnvironmentForBaseUrl({
+  baseUrl,
+}: {
+  baseUrl: string;
+}): VideogenEnvironment {
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+
+  for (const environment of HOSTED_VIDEOGEN_ENVIRONMENTS) {
+    if (normalizedBaseUrl === getDefaultBaseUrl({ environment })) {
+      return environment;
+    }
+  }
+
+  return getVideogenEnvironment();
 }

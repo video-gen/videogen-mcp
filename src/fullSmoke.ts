@@ -24,7 +24,7 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
  *     rendering quality we don't control, and storyboard_to_video has no
  *     implementation in the current SDK (see the tool's own comment). They are
  *     still invoked and their outcome logged.
- *   - Long-running (awaited) calls start with `wait: false`, then poll
+ *   - Long-running hosted calls return start ids, then poll
  *     `get_tool_execution` / `get_workflow_run` / `get_project_export` with short
  *     HTTP requests so each request stays under Cloudflare's ~100s proxy read
  *     timeout (a single wait-to-terminal call would 524).
@@ -33,6 +33,11 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 // Every tool registered on the HOSTED (Streamable HTTP) server — see
 // registerTools + registerUploadWidget. tools/list must expose all of them.
 const ALL_HOSTED_TOOLS = [
+  // guidance (noauth docs; Mixpanel-style resources + mirror tools)
+  "get_getting_started_guidance",
+  "get_async_tasks_guidance",
+  "get_workflows_guidance",
+  "get_tools_vs_workflows_guidance",
   // workflows
   "script_to_video",
   "voiceover_to_video",
@@ -71,8 +76,15 @@ const ALL_HOSTED_TOOLS = [
   "create_file_upload",
   "get_file",
   "list_files",
+  // entities
+  "list_entities",
+  "create_entity",
+  "get_entity",
+  "update_entity",
+  "archive_entity",
+  "add_entity_reference",
+  "remove_entity_reference",
   // resources
-  "list_avatar_presenters",
   "list_tts_voices",
   "list_languages",
   // account
@@ -93,11 +105,17 @@ const LONG_CALL_TIMEOUT_MS = 60 * 1000;
 const LONG_POLL_TIMEOUT_MS = 20 * 60 * 1000;
 const LONG_POLL_INTERVAL_MS = 3000;
 
-// A valid 1x1 transparent PNG, used as the source image for image tools.
-const PNG_1X1_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+// Providers commonly reject images smaller than 256x256.
+const PNG_256_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAACAElEQVR42u3TQQ0AAAjEsJOCVKQihTcaaFIFS5bqgbciAQYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABMIAKGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAYAA4ABwABgADAAGAAMAAbAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAGUAEDgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAAGAAMAAYAAwABgADgAHAABgADAAGAAOAAcAAYAAwABgADAAGAAOAAcAAYAAwABgADAAGAAOAAcAAYAAwABgADAAGAAOAAcAAYAAwABgADAAGAAOAAcAAYAAwAFwLMPAWgekzN7AAAAAASUVORK5CYII=";
 
-type IdPrefix = "vg_file_" | "vg_tool_" | "vg_work_" | "vg_proj_" | "vg_voic_" | "vg_pres_";
+type IdPrefix =
+  | "vg_file_"
+  | "vg_tool_"
+  | "vg_work_"
+  | "vg_proj_"
+  | "vg_voic_"
+  | "vg_enti_";
 
 const readProp = (value: unknown, key: string): unknown =>
   value != null && typeof value === "object" ? Reflect.get(value, key) : undefined;
@@ -338,13 +356,13 @@ export async function runFullCoverage({
       return await invoke(name, args);
     }
 
-    // upload_file / get_file manage their own readiness wait; do not inject wait:false.
+    // upload_file / get_file manage their own readiness wait.
     if (name === "upload_file" || name === "get_file") {
       return await invoke(name, args);
     }
 
-    // Start without holding the HTTP connection open for the whole generation.
-    const started = await invoke(name, { ...args, wait: false });
+    // Hosted composite tools start without holding the HTTP connection open.
+    const started = await invoke(name, args);
 
     if (getIsTerminalSnapshot(started)) {
       return started;
@@ -423,15 +441,32 @@ export async function runFullCoverage({
   // we can assign `findPrefixedId(...) ?? undefined`.
   const ctx: {
     voiceId?: string | undefined;
-    presenterId?: string | undefined;
     imageFileId?: string | undefined;
     audioFileId?: string | undefined;
     videoFileId?: string | undefined;
     pdfFileId?: string | undefined;
+    entityId?: string | undefined;
     toolExecutionId?: string | undefined;
     workflowRunId?: string | undefined;
     projectId?: string | undefined;
   } = {};
+
+  // ---- guidance (noauth; no credits) ----
+  await step("get_getting_started_guidance", async () => {
+    await call("get_getting_started_guidance", {});
+  });
+
+  await step("get_async_tasks_guidance", async () => {
+    await call("get_async_tasks_guidance", {});
+  });
+
+  await step("get_workflows_guidance", async () => {
+    await call("get_workflows_guidance", {});
+  });
+
+  await step("get_tools_vs_workflows_guidance", async () => {
+    await call("get_tools_vs_workflows_guidance", {});
+  });
 
   // ---- account + read-only resource/list tools ----
   await step("get_me", async () => {
@@ -463,12 +498,6 @@ export async function runFullCoverage({
     return ctx.voiceId != null ? `voiceId=${ctx.voiceId}` : "no voices returned";
   });
 
-  await step("list_avatar_presenters", async () => {
-    const json = await call("list_avatar_presenters", { limit: 5 });
-    ctx.presenterId = findPrefixedId(json, "vg_pres_") ?? undefined;
-    return ctx.presenterId != null ? `presenterId=${ctx.presenterId}` : "no presenters returned";
-  });
-
   await step("list_files", async () => {
     await call("list_files", { limit: 5 });
   });
@@ -490,7 +519,7 @@ export async function runFullCoverage({
     const json = await call(
       "upload_file",
       {
-        fileData: PNG_1X1_BASE64,
+        fileData: PNG_256_BASE64,
         displayName: "mcp-smoke.png",
         type: "IMAGE",
       },
@@ -512,6 +541,81 @@ export async function runFullCoverage({
 
     await call("get_file", { fileId: ctx.imageFileId });
     return `fileId=${ctx.imageFileId}`;
+  });
+
+  await step("list_entities", async () => {
+    await call("list_entities", { limit: 5 });
+  });
+
+  await step("create_entity", async () => {
+    const json = await call("create_entity", {
+      entityType: "PRODUCT",
+      name: "MCP smoke product",
+      description: "Created by MCP full smoke",
+    });
+    ctx.entityId = findPrefixedId(json, "vg_enti_") ?? undefined;
+
+    if (ctx.entityId == null) {
+      throw new Error("create_entity did not return an entity id");
+    }
+
+    return `entityId=${ctx.entityId}`;
+  });
+
+  await step("add_entity_reference", async () => {
+    if (ctx.entityId == null || ctx.imageFileId == null) {
+      throw new Error("need entityId and imageFileId to add a reference");
+    }
+
+    await call("add_entity_reference", {
+      entityId: ctx.entityId,
+      fileId: ctx.imageFileId,
+      isDefault: true,
+      description: "Smoke reference",
+    });
+    return `entityId=${ctx.entityId}`;
+  });
+
+  await step("get_entity", async () => {
+    if (ctx.entityId == null) {
+      throw new Error("no entity id to fetch");
+    }
+
+    await call("get_entity", { entityId: ctx.entityId });
+    return `entityId=${ctx.entityId}`;
+  });
+
+  await step("update_entity", async () => {
+    if (ctx.entityId == null) {
+      throw new Error("no entity id to update");
+    }
+
+    await call("update_entity", {
+      entityId: ctx.entityId,
+      name: "MCP smoke product (updated)",
+    });
+    return `entityId=${ctx.entityId}`;
+  });
+
+  await step("remove_entity_reference", async () => {
+    if (ctx.entityId == null || ctx.imageFileId == null) {
+      throw new Error("need entityId and imageFileId to remove a reference");
+    }
+
+    await call("remove_entity_reference", {
+      entityId: ctx.entityId,
+      fileId: ctx.imageFileId,
+    });
+    return `entityId=${ctx.entityId}`;
+  });
+
+  await step("archive_entity", async () => {
+    if (ctx.entityId == null) {
+      throw new Error("no entity id to archive");
+    }
+
+    await call("archive_entity", { entityId: ctx.entityId });
+    return `entityId=${ctx.entityId}`;
   });
 
   await step("create_file_upload", async () => {
@@ -560,7 +664,7 @@ export async function runFullCoverage({
 
     const json = await call(
       "text_to_speech",
-      { ttsText: "This is a VideoGen MCP smoke test.", voiceId: ctx.voiceId },
+      { text: "This is a VideoGen MCP smoke test.", voiceId: ctx.voiceId },
       { longRunning: true },
     );
     assertTerminalSuccess(json, "text_to_speech");
@@ -621,18 +725,33 @@ export async function runFullCoverage({
   await step(
     "generate_avatar",
     async () => {
-      if (ctx.presenterId == null || ctx.audioFileId == null) {
-        throw new Error(
-          `missing prerequisite (presenterId=${ctx.presenterId ?? "none"}, audioFileId=${ctx.audioFileId ?? "none"})`,
-        );
+      if (ctx.imageFileId == null || ctx.audioFileId == null) {
+        throw new Error("missing image or audio prerequisite for generate_avatar");
       }
+
+      const actor = await call("create_entity", {
+        entityType: "ACTOR",
+        name: "MCP smoke avatar actor",
+        description: "Created by MCP full smoke",
+      });
+      const actorEntityId = findPrefixedId(actor, "vg_enti_");
+      if (actorEntityId == null) {
+        throw new Error("create_entity did not return an actor entity id");
+      }
+      await call("add_entity_reference", {
+        entityId: actorEntityId,
+        fileId: ctx.imageFileId,
+        isDefault: true,
+        description: "Avatar smoke reference",
+      });
 
       const json = await call(
         "generate_avatar",
-        { avatarPresenterId: ctx.presenterId, audioFileId: ctx.audioFileId },
+        { actorEntityId, avatarQuality: "LOW", audioFileId: ctx.audioFileId },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "generate_avatar");
+      await call("archive_entity", { entityId: actorEntityId });
     },
     { sampleable: true },
   );
@@ -749,11 +868,10 @@ export async function runFullCoverage({
   });
 
   await step("cancel_tool_execution", async () => {
-    // Start a fresh execution without waiting so there is something in-flight to cancel.
+    // Start a fresh hosted execution so there is something in-flight to cancel.
     const started = await call("generate_image", {
       prompt: "A blue circle on a white background.",
       quality: "LOW",
-      wait: false,
     });
     const toolExecutionId = findPrefixedId(started, "vg_tool_");
 
@@ -771,8 +889,6 @@ export async function runFullCoverage({
       "script_to_video",
       {
         script: "Welcome to VideoGen. This is a short automated smoke test of the script to video workflow.",
-        visualStyle: { type: "STOCK" },
-        remixActions: [{ type: "ENABLE_CAPTIONS" }, { type: "SET_BACKGROUND_MUSIC" }],
       },
       { longRunning: true },
     );
@@ -791,7 +907,7 @@ export async function runFullCoverage({
 
       const json = await call(
         "voiceover_to_video",
-        { fileId: ctx.audioFileId, visualStyle: { type: "STOCK" } },
+        { fileId: ctx.audioFileId },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "voiceover_to_video");
@@ -844,11 +960,9 @@ export async function runFullCoverage({
   });
 
   await step("cancel_workflow_run", async () => {
-    // Start a fresh run without waiting so there is something in-flight to cancel.
+    // The internal wait window may return while the run is still active on hosted MCP.
     const started = await call("script_to_video", {
       script: "A run started only to be cancelled by the smoke test.",
-      visualStyle: { type: "STOCK" },
-      wait: false,
     });
     const workflowRunId = findPrefixedId(started, "vg_work_");
 
@@ -882,10 +996,7 @@ export async function runFullCoverage({
 
       await call("remix_project", {
         projectId: ctx.projectId,
-        remixActions: [
-          { type: "ENABLE_CAPTIONS" },
-          { type: "SET_BACKGROUND_MUSIC", fileId: null },
-        ],
+        edits: ["CAPTIONS", "TRANSITIONS"],
       });
     },
     { sampleable: true },

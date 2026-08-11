@@ -5,6 +5,7 @@ import {
   MCP_PATH,
   OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH,
   OAUTH_PROTECTED_RESOURCE_MCP_PATH,
+  buildAuthorizationServerMetadata,
   buildProtectedResourceMetadata,
   buildResourceMetadataUrl,
   buildWwwAuthenticateChallenge,
@@ -20,7 +21,7 @@ void test("buildProtectedResourceMetadata returns null when no OAuth issuer is c
   );
 });
 
-void test("buildProtectedResourceMetadata returns the RFC 9728 document when an issuer is set", () => {
+void test("buildProtectedResourceMetadata for /mcp advertises the pathless MCP origin (Cursor)", () => {
   const metadata = buildProtectedResourceMetadata({
     origin: "https://dev.mcp.videogen.io",
     oauthIssuer: "https://example.supabase.co/auth/v1",
@@ -28,13 +29,15 @@ void test("buildProtectedResourceMetadata returns the RFC 9728 document when an 
 
   assert.ok(metadata != null);
   assert.equal(metadata.resource, `https://dev.mcp.videogen.io${MCP_PATH}`);
-  assert.deepEqual(metadata.authorization_servers, ["https://example.supabase.co/auth/v1"]);
+  // Pathless origin — Cursor strips `/auth/v1` from Supabase issuers and then
+  // cannot rediscover AS metadata on the bare project host.
+  assert.deepEqual(metadata.authorization_servers, ["https://dev.mcp.videogen.io"]);
   assert.deepEqual(metadata.scopes_supported, ["email", "profile"]);
   assert.deepEqual(metadata.bearer_methods_supported, ["header"]);
   assert.equal(typeof metadata.resource_documentation, "string");
 });
 
-void test("buildProtectedResourceMetadata accepts the ChatGPT resource path", () => {
+void test("buildProtectedResourceMetadata for /mcp/chatgpt keeps the Supabase path issuer", () => {
   const metadata = buildProtectedResourceMetadata({
     origin: "https://dev.mcp.videogen.io",
     oauthIssuer: "https://example.supabase.co/auth/v1",
@@ -43,6 +46,29 @@ void test("buildProtectedResourceMetadata accepts the ChatGPT resource path", ()
 
   assert.ok(metadata != null);
   assert.equal(metadata.resource, `https://dev.mcp.videogen.io${MCP_CHATGPT_PATH}`);
+  assert.deepEqual(metadata.authorization_servers, ["https://example.supabase.co/auth/v1"]);
+});
+
+void test("buildAuthorizationServerMetadata points authorize/token/register at Supabase", () => {
+  const metadata = buildAuthorizationServerMetadata({
+    origin: "https://dev.mcp.videogen.io",
+    oauthIssuer: "https://example.supabase.co/auth/v1",
+  });
+
+  assert.equal(metadata.issuer, "https://dev.mcp.videogen.io");
+  assert.equal(
+    metadata.authorization_endpoint,
+    "https://example.supabase.co/auth/v1/oauth/authorize",
+  );
+  assert.equal(metadata.token_endpoint, "https://example.supabase.co/auth/v1/oauth/token");
+  assert.equal(
+    metadata.registration_endpoint,
+    "https://example.supabase.co/auth/v1/oauth/clients/register",
+  );
+  assert.equal(
+    metadata.jwks_uri,
+    "https://example.supabase.co/auth/v1/.well-known/jwks.json",
+  );
 });
 
 void test("buildResourceMetadataUrl uses RFC 9728 path-aware discovery", () => {
@@ -86,14 +112,3 @@ void test("buildWwwAuthenticateChallenge includes path-aware resource_metadata w
   );
 });
 
-void test("buildWwwAuthenticateChallenge can include invalid_token for lazy-auth gates", () => {
-  const challenge = buildWwwAuthenticateChallenge({
-    origin: "https://dev.mcp.videogen.io",
-    oauthIssuer: "https://example.supabase.co/auth/v1",
-    includeInvalidToken: true,
-  });
-
-  assert.ok(challenge.includes('error="invalid_token"'));
-  assert.ok(challenge.includes("error_description="));
-  assert.ok(challenge.includes('scope="email profile"'));
-});

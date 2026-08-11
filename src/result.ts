@@ -1,6 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { MEDIA_PREVIEW_WIDGET_URI } from "./appWidget";
+import { buildMediaPageUrlForApiFileId } from "./mediaPageUrl";
 
 const errorMessageSchema = z.object({ message: z.string() });
 const statusCodeSchema = z.object({ statusCode: z.number() });
@@ -16,6 +17,64 @@ const getIsRecord = (value: unknown): value is Record<string, unknown> => {
 const readNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.length > 0 ? value : null;
 };
+
+const APP_MEDIA_URL_FIELD = "appMediaUrl";
+
+/**
+ * Attaches `appMediaUrl` (`/media?storageFileId=…`) next to each file id so
+ * ChatGPT widgets can open the in-app media modal instead of signed R2 URLs.
+ */
+export function enrichStructuredContentWithAppMediaUrls(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const enrichRecord = (record: Record<string, unknown>): Record<string, unknown> => {
+    const fileId = readNonEmptyString(record.fileId);
+    if (fileId == null) {
+      return record;
+    }
+
+    const appMediaUrl = buildMediaPageUrlForApiFileId({ fileId });
+    if (appMediaUrl == null) {
+      return record;
+    }
+
+    return { ...record, [APP_MEDIA_URL_FIELD]: appMediaUrl };
+  };
+
+  let next: Record<string, unknown> = enrichRecord(data);
+
+  if (getIsRecord(next.file)) {
+    next = { ...next, file: enrichRecord(next.file) };
+  }
+
+  if (Array.isArray(next.results)) {
+    next = {
+      ...next,
+      results: next.results.map((result) => {
+        if (!getIsRecord(result)) {
+          return result;
+        }
+
+        let enrichedResult = enrichRecord(result);
+        if (getIsRecord(enrichedResult.file)) {
+          enrichedResult = { ...enrichedResult, file: enrichRecord(enrichedResult.file) };
+        }
+
+        return enrichedResult;
+      }),
+    };
+  }
+
+  const exportFileId = readNonEmptyString(next.exportFileId);
+  if (exportFileId != null && readNonEmptyString(next[APP_MEDIA_URL_FIELD]) == null) {
+    const appMediaUrl = buildMediaPageUrlForApiFileId({ fileId: exportFileId });
+    if (appMediaUrl != null) {
+      next = { ...next, [APP_MEDIA_URL_FIELD]: appMediaUrl };
+    }
+  }
+
+  return next;
+}
 
 /**
  * True when structured content carries at least one signed media URL the
@@ -82,9 +141,11 @@ export function jsonResult(data: unknown): CallToolResult {
 
   if (getIsPlainJsonObject(data)) {
     if (getHasInlineMediaUrls(data)) {
+      const structuredContent = enrichStructuredContentWithAppMediaUrls(data);
+
       return {
         content: [{ type: "text", text }],
-        structuredContent: data,
+        structuredContent,
         _meta: { "openai/outputTemplate": MEDIA_PREVIEW_WIDGET_URI },
       };
     }

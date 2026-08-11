@@ -33,18 +33,6 @@ type ToolResult = {
   isError?: boolean;
 };
 
-type OpenAiHost = {
-  callTool: (name: string, args: Record<string, unknown>) => Promise<ToolResult>;
-  setWidgetState?: (state: Record<string, unknown>) => Promise<void> | void;
-  sendFollowUpMessage?: (args: { prompt: string }) => Promise<void> | void;
-};
-
-declare global {
-  interface Window {
-    openai?: OpenAiHost;
-  }
-}
-
 type UploadPhase = "idle" | "creating" | "uploading" | "processing" | "done" | "error";
 
 const ACCENT = "#2563eb";

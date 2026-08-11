@@ -3,16 +3,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * The MCP resource URI for the ChatGPT App upload widget. Acts as the cache key
- * for the host, so bump it whenever the widget markup or bundle changes.
+ * The stable MCP resource URI for the ChatGPT App upload widget. Compatible
+ * widget updates may remain cached by the host for up to one hour.
  */
-export const UPLOAD_WIDGET_URI = "ui://widget/videogen-upload-v3.html";
+export const UPLOAD_WIDGET_URI = "ui://widget/videogen-upload.html";
 
 /**
  * Inline media preview for generation / export / file tool results (images,
- * videos, audio). Bump when the widget markup or bundle changes.
+ * videos, audio). Compatible updates may remain cached for up to one hour.
  */
-export const MEDIA_PREVIEW_WIDGET_URI = "ui://widget/videogen-media-preview-v3.html";
+export const MEDIA_PREVIEW_WIDGET_URI = "ui://widget/videogen-media-preview.html";
 
 /**
  * The MCP Apps UI MIME type. A host only wires up the MCP Apps bridge (so
@@ -86,14 +86,30 @@ export const UPLOAD_WIDGET_CSP = {
 export const WIDGET_CSP = UPLOAD_WIDGET_CSP;
 
 /**
+ * App origins allowed for `openExternal` from the media-preview widget.
+ * Open must deep-link to `/media?storageFileId=…` — never to signed R2 URLs.
+ */
+const MEDIA_PREVIEW_REDIRECT_DOMAINS = [
+  "https://app.videogen.io",
+  "https://prerelease.app.videogen.io",
+  "https://dev.app.videogen.io",
+  "https://staging.app.videogen.io",
+  "http://localhost:3000",
+] as const;
+
+/**
  * Media preview loads signed download / thumbnail / video URLs as img/video/audio
  * `src`, so those hosts must be in `resourceDomains`. Workspace file downloads
  * are GCS or Mux signed URLs; upload PUTs (and some assets) use R2.
+ *
+ * `redirectDomains` is only for `openExternal` — the Open button goes to the
+ * VideoGen Media page, not signed storage URLs (hosts append query params and
+ * break signatures). See `.cursor/rules/no-signed-storage-urls-in-external-widgets.mdc`.
  */
 export const MEDIA_PREVIEW_WIDGET_CSP = {
   connectDomains: [] as string[],
   resourceDomains: [...MEDIA_RESOURCE_DOMAINS],
-  redirectDomains: [...MEDIA_RESOURCE_DOMAINS],
+  redirectDomains: [...MEDIA_PREVIEW_REDIRECT_DOMAINS],
 } as const;
 
 type WidgetCsp = {

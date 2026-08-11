@@ -1,13 +1,15 @@
 import { VideoGen } from "@videogen/sdk";
 import type { VideoGenEnv } from "./env";
+import type { McpUpstreamClientId } from "./mcpUpstreamClientId";
 
 /**
  * Lazily produces the VideoGen SDK client. Constructing the client requires a
  * credential (the SDK constructor rejects an empty/absent key), so we defer
  * construction to the moment a tool actually performs an API call rather than
- * building it up front. On the hosted OAuth server, anonymous discovery
- * (`initialize` / `tools/list`) never invokes a tool handler and therefore never
- * calls this — so it needs no credential and no placeholder key.
+ * building it up front. On the hosted ChatGPT endpoint, anonymous discovery
+ * never invokes a tool handler and therefore never calls this, so it needs no
+ * credential or placeholder key. The standard endpoint requires a bearer
+ * before discovery.
  */
 export type GetVideoGenClient = () => VideoGen;
 
@@ -28,11 +30,16 @@ export type GetVideoGenClient = () => VideoGen;
 export function createVideoGenClientFromToken({
   bearerToken,
   baseUrl,
+  clientId = "mcp",
 }: {
   bearerToken: string;
   baseUrl: string;
+  // Stamp the `X-VideoGen-Client` header so usage attribution and auto-detected
+  // integrations can tell Cursor (`cursor`), Raycast (`raycast`), ChatGPT
+  // (`chatgpt`), etc. apart from the generic MCP host (`mcp`).
+  clientId?: McpUpstreamClientId;
 }): VideoGen {
-  return new VideoGen({ apiKey: bearerToken, baseUrl, clientId: "mcp" });
+  return new VideoGen({ apiKey: bearerToken, baseUrl, clientId });
 }
 
 export function createVideoGenClient(env: VideoGenEnv): VideoGen {

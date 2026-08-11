@@ -1,0 +1,24 @@
+$ tsup && tsup --config tsup.widget.config.ts
+CLI Building entry: src/http.ts, src/index.ts, src/smoke.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.config.ts
+CLI Target: node20
+CLI Cleaning output folder
+ESM Build start
+ESM dist/http.js      125.94 KB
+ESM dist/smoke.js     33.10 KB
+ESM dist/index.js     108.55 KB
+ESM dist/smoke.js.map 68.04 KB
+ESM dist/http.js.map  277.24 KB
+ESM dist/index.js.map 232.77 KB
+ESM ⚡️ Build success in 26ms
+CLI Building entry: {"uploadWidget":"web/uploadWidget.tsx","mediaPreviewWidget":"web/mediaPreviewWidget.tsx"}
+CLI Using tsconfig: web/tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.widget.config.ts
+CLI Target: es2020
+IIFE Build start
+IIFE dist/widget/uploadWidget.global.js       193.39 KB
+IIFE dist/widget/mediaPreviewWidget.global.js 197.21 KB
+IIFE ⚡️ Build success in 32ms

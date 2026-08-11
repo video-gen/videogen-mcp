@@ -1,4 +1,19 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  toGenerateAvatarRequest,
+  toGenerateImageRequest,
+  toGenerateMotionGraphicRequest,
+  toGenerateMusicRequest,
+  toGenerateSoundEffectRequest,
+  toGenerateVideoClipRequest,
+  toImage3dEffectRequest,
+  toRemoveImageBackgroundRequest,
+  toRemoveVideoBackgroundRequest,
+  toTextToSpeechRequest,
+  toUpscaleImageRequest,
+  toUpscaleVideoRequest,
+  toVectorizeImageRequest,
+} from "../adapters/mediaToolAdapters";
 import { MEDIA_PREVIEW_TOOL_META } from "../appWidget";
 import type { GetVideoGenClient } from "../client";
 import {
@@ -19,11 +34,16 @@ import {
   upscaleVideoInputSchema,
   vectorizeImageInputSchema,
 } from "../inputSchemas";
-import { type McpOperations, dropUndefined, extractControls } from "../operations";
+import { type McpOperations, dropUndefined } from "../operations";
 import {
   listToolExecutionsOutputSchema,
   toolExecutionOutputSchema,
 } from "../outputSchemas";
+import {
+  DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
+  READ_ONLY_TOOL_ANNOTATIONS,
+  WRITE_PRIVATE_TOOL_ANNOTATIONS,
+} from "../toolAnnotations";
 
 type MediaPreviewToolMeta = typeof MEDIA_PREVIEW_TOOL_META;
 
@@ -49,16 +69,15 @@ export function registerMediaToolTools(
         "Generate an image from a text prompt, optionally conditioned on source images (image-to-image).",
       inputSchema: generateImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.generateImage(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.generateImage(toGenerateImageRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -69,16 +88,15 @@ export function registerMediaToolTools(
         "Generate a video clip from a text prompt, source images, or source videos. quality is optional (STANDARD, HIGH, or MAX; LOW is not supported).",
       inputSchema: generateVideoClipInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.generateVideoClip(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.generateVideoClip(toGenerateVideoClipRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -88,16 +106,15 @@ export function registerMediaToolTools(
       description: "Convert text into spoken audio using a selectable voice.",
       inputSchema: textToSpeechInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.textToSpeech(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.textToSpeech(toTextToSpeechRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -107,16 +124,15 @@ export function registerMediaToolTools(
       description: "Generate a sound effect from a text prompt.",
       inputSchema: generateSoundEffectInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.generateSoundEffect(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.generateSoundEffect(toGenerateSoundEffectRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -126,16 +142,15 @@ export function registerMediaToolTools(
       description: "Generate a music track from a text prompt.",
       inputSchema: generateMusicInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.generateMusic(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.generateMusic(toGenerateMusicRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -143,19 +158,18 @@ export function registerMediaToolTools(
     {
       title: "Generate motion graphic",
       description:
-        "Generate an animated motion graphic video from a text prompt. Best for precise text animations (typing effects, kinetic typography, lower thirds) that stock or generated footage can't express. Optionally pass reference media file ids to display or animate.",
+        "Generate an animated motion graphic video from a text prompt. Best for precise text animations (typing effects, kinetic typography, lower thirds) that stock or generated footage can't express. Outputs a transparent WebM overlay by default; set transparentBackground to false for an opaque MP4. Optionally pass reference media file ids to display or animate.",
       inputSchema: generateMotionGraphicInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.generateMotionGraphic(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.generateMotionGraphic(toGenerateMotionGraphicRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -163,19 +177,18 @@ export function registerMediaToolTools(
     {
       title: "Generate avatar",
       description:
-        "Generate a talking-head avatar video from a presenter and an uploaded audio file.",
+        "Generate a talking-head avatar video from an ACTOR entity and an uploaded audio file. Pass actorEntityId and optionally set avatarQuality.",
       inputSchema: generateAvatarInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.generateAvatar(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.generateAvatar(toGenerateAvatarRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -185,16 +198,15 @@ export function registerMediaToolTools(
       description: "Convert a raster image into a vector (SVG).",
       inputSchema: vectorizeImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.vectorizeImage(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.vectorizeImage(toVectorizeImageRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -204,16 +216,16 @@ export function registerMediaToolTools(
       description: "Remove the background from an image.",
       inputSchema: removeImageBackgroundInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.removeImageBackground(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () =>
+          getClient().tools.removeImageBackground(toRemoveImageBackgroundRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -223,16 +235,16 @@ export function registerMediaToolTools(
       description: "Remove the background from a video.",
       inputSchema: removeVideoBackgroundInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.removeVideoBackground(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () =>
+          getClient().tools.removeVideoBackground(toRemoveVideoBackgroundRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -242,16 +254,15 @@ export function registerMediaToolTools(
       description: "Increase the resolution of an image.",
       inputSchema: upscaleImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.upscaleImage(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.upscaleImage(toUpscaleImageRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -261,16 +272,15 @@ export function registerMediaToolTools(
       description: "Increase the resolution of a video.",
       inputSchema: upscaleVideoInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.upscaleVideo(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.upscaleVideo(toUpscaleVideoRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -280,16 +290,15 @@ export function registerMediaToolTools(
       description: "Add 3D parallax motion to a still image, producing a video.",
       inputSchema: image3dEffectInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
-    async (args) => {
-      const { wait, pollIntervalMs, timeoutMs, ...rest } = args;
-      return await runComposite({
-        start: () => getClient().tools.image3dEffect(dropUndefined(rest)),
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.image3dEffect(toImage3dEffectRequest(args)),
         ...pollToTerminal(getClient),
-        controls: extractControls({ wait, pollIntervalMs, timeoutMs }),
-      });
-    },
+        controls: {},
+      }),
   );
 
   server.registerTool(
@@ -299,6 +308,7 @@ export function registerMediaToolTools(
       description: "List past tool executions, most recent first.",
       inputSchema: listToolExecutionsInputSchema,
       outputSchema: listToolExecutionsOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (args) =>
       await respondSdk(() => getClient().tools.listToolExecutions(dropUndefined(args))),
@@ -311,6 +321,7 @@ export function registerMediaToolTools(
       description: "Fetch the current status and results of a single tool execution.",
       inputSchema: getToolExecutionInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: READ_ONLY_TOOL_ANNOTATIONS,
       ...mediaPreviewToolFields,
     },
     async (args) =>
@@ -326,6 +337,7 @@ export function registerMediaToolTools(
       description: "Request cancellation of an in-progress tool execution.",
       inputSchema: cancelToolExecutionInputSchema,
       outputSchema: toolExecutionOutputSchema,
+      annotations: DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) =>
       await respondSdk(() =>
