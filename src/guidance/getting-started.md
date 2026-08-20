@@ -35,9 +35,9 @@ If this fails with 401, stop and fix auth before starting workflows or tools (th
 
 When unsure between workflow vs tool, call `get_tools_vs_workflows_guidance`. When unsure **which** workflow (especially script vs storyboard), call `get_workflows_guidance` and **ask the user** with short pros/cons before spending credits.
 
-### Step 4 — Expect async work
+### Step 4 — Expect async work, and say how long
 
-Workflows, media tools, and exports return ids and progress toward a terminal status (`succeeded`, `failed`, or `cancelled`). On the **hosted** server, long runs may return before completion; continue with `get_workflow_run`, `get_tool_execution`, or `get_project_export`. Details: `get_async_tasks_guidance`.
+Workflows, media tools, and exports return ids and progress toward a terminal status (`succeeded`, `failed`, or `cancelled`). Generation is not instant: images are often under a minute, video clips and motion graphics commonly take a few minutes, and full workflows take several. Tell the user that wait up front. On the **hosted** server, long runs may return before completion; continue with `get_workflow_run`, `get_tool_execution`, or `get_project_export`. Details: `get_async_tasks_guidance`.
 
 ---
 

@@ -44,22 +44,38 @@ describe("storyboard_to_video input schema", () => {
     assert.equal(result.success, true);
   });
 
-  it("rejects removed raw API fields", () => {
+  it("rejects video-only quality tiers that the storyboard API does not accept", () => {
+    const result = schema.safeParse({
+      scenes: [{ prompt: "A polished product reveal." }],
+      quality: "LOW",
+    });
+
+    assert.equal(result.success, false);
+  });
+
+  it("strips removed raw API fields instead of rejecting the call", () => {
     const result = schema.safeParse({
       scenes: [{ prompt: "A polished product reveal." }],
       isOutputTemporary: true,
       remixActions: [{ type: "ENABLE_CAPTIONS" }],
     });
 
-    assert.equal(result.success, false);
+    assert.equal(result.success, true);
+    if (result.success) {
+      assert.equal("isOutputTemporary" in result.data, false);
+      assert.equal("remixActions" in result.data, false);
+    }
   });
 
-  it("rejects unsupported nested scene fields", () => {
+  it("strips unsupported nested scene fields instead of rejecting the call", () => {
     const result = schema.safeParse({
       scenes: [{ prompt: "A polished product reveal.", unsupportedControl: true }],
     });
 
-    assert.equal(result.success, false);
+    assert.equal(result.success, true);
+    if (result.success) {
+      assert.deepEqual(result.data.scenes[0], { prompt: "A polished product reveal." });
+    }
   });
 });
 
@@ -74,8 +90,45 @@ describe("generate_video_clip input schema", () => {
     );
   });
 
-  it("rejects requests without a prompt or reference media", () => {
+  it("rejects requests without a prompt, spokenDialogue, or reference media", () => {
     assert.equal(generateVideoClipInputSchema.safeParse({}).success, false);
+  });
+
+  it("accepts an opening-frame still as the only input", () => {
+    assert.equal(
+      generateVideoClipInputSchema.safeParse({
+        startFrameFileId: "vg_file_start",
+      }).success,
+      true,
+    );
+  });
+
+  it("accepts spokenDialogue as the only input", () => {
+    assert.equal(
+      generateVideoClipInputSchema.safeParse({
+        spokenDialogue: "Meet your new everyday lip tint.",
+      }).success,
+      true,
+    );
+  });
+
+  it("accepts suppressBackgroundMusic", () => {
+    assert.equal(
+      generateVideoClipInputSchema.safeParse({
+        prompt: "A product push-in.",
+        suppressBackgroundMusic: true,
+      }).success,
+      true,
+    );
+  });
+
+  it("does not treat voiceDescription alone as enough input", () => {
+    assert.equal(
+      generateVideoClipInputSchema.safeParse({
+        voiceDescription: "A warm, confident young woman's voice",
+      }).success,
+      false,
+    );
   });
 });
 

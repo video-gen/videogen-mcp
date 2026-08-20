@@ -34,6 +34,7 @@ const FORBIDDEN_FIELDS = [
   "isOutputTemporary",
   "watermarkMode",
   "numResults",
+  "hideFromUi",
   "wait",
   "pollIntervalMs",
   "timeoutMs",
@@ -86,11 +87,12 @@ describe("creative tools/list contracts", () => {
         aspectRatio: { width: 0, height: 9 },
       }),
     );
-    assert.throws(() =>
+    assert.deepEqual(
       scriptToVideoInputSchema.parse({
         script: "Hello.",
         format: "16:9",
       }),
+      { script: "Hello." },
     );
   });
 
@@ -143,6 +145,10 @@ describe("creative tools/list contracts", () => {
       assert.match(transparentBackgroundSchema.description ?? "", /transparent WebM/);
       assert.match(transparentBackgroundSchema.description ?? "", /overlay/);
       assert.match(transparentBackgroundSchema.description ?? "", /opaque MP4/);
+      assert.ok(
+        motionGraphicTool?.inputSchema.properties?.subToolModes != null,
+        "generate_motion_graphic must advertise subToolModes so ChatGPT stays aligned with the API",
+      );
     } finally {
       await client.close();
       await server.close();

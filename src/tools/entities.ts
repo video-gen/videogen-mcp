@@ -22,8 +22,8 @@ import {
 } from "../toolAnnotations";
 
 /**
- * Entity CRUD for consistent ACTOR / PRODUCT / VISUAL_STYLE references used by
- * workflows and `generate_avatar`. Typical create flow:
+ * Entity CRUD for consistent ACTOR / PRODUCT / VISUAL_STYLE / SLIDESHOW_THEME
+ * references used by workflows and `generate_avatar`. Typical create flow:
  *   1. Upload an image (`upload_file` / `create_file_upload` / `open_uploader`)
  *   2. `create_entity` with entityType + name
  *   3. `add_entity_reference` with the uploaded fileId (isDefault: true)
@@ -39,7 +39,7 @@ export function registerEntityTools(
     {
       title: "List entities",
       description:
-        "List ACTOR, PRODUCT, and VISUAL_STYLE entities on the team. Filter with entityType when you only need one kind.",
+        "List built-in actors, products, visual styles, and slideshow themes plus team entities. Built-in rows have isBuiltIn true and cannot be updated or archived. Filter with entityType when you only need one kind.",
       inputSchema: listEntitiesInputSchema,
       outputSchema: listEntitiesOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -53,7 +53,7 @@ export function registerEntityTools(
     {
       title: "Create entity",
       description:
-        "Create an ACTOR (character), PRODUCT (product/object), or VISUAL_STYLE entity. After create, attach at least one image with add_entity_reference (upload the image first). Use the returned entityId as actorEntityId on generate_avatar / script_to_video, or as a product/style reference in storyboard scenes.",
+        "Create an ACTOR (character), PRODUCT (product/object), VISUAL_STYLE, or SLIDESHOW_THEME entity. After create, attach at least one reference with add_entity_reference (upload the file first). Slideshow themes may attach an image or a PDF / PowerPoint. Use the returned entityId as actorEntityId on generate_avatar / script_to_video, a product/style reference in storyboard scenes, or slideshowThemeEntityId on slideshow_to_video.",
       inputSchema: createEntityInputSchema,
       outputSchema: entityOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -66,7 +66,8 @@ export function registerEntityTools(
     "get_entity",
     {
       title: "Get entity",
-      description: "Fetch one entity by id, including its reference images.",
+      description:
+        "Fetch one entity by id, including its reference images. Built-in catalog entities are included and have isBuiltIn true.",
       inputSchema: getEntityInputSchema,
       outputSchema: entityOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -78,7 +79,8 @@ export function registerEntityTools(
     "update_entity",
     {
       title: "Update entity",
-      description: "Update an entity's display name and/or description.",
+      description:
+        "Update an entity's display name and/or description. Built-in entities cannot be updated.",
       inputSchema: updateEntityInputSchema,
       outputSchema: entityOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -92,7 +94,7 @@ export function registerEntityTools(
     {
       title: "Archive entity",
       description:
-        "Archive an entity so it no longer appears in lists or pickers. Prefer this over leaving unused entities around.",
+        "Archive an entity so it no longer appears in lists or pickers. Built-in entities cannot be archived.",
       inputSchema: archiveEntityInputSchema,
       outputSchema: entityArchiveOutputSchema,
       annotations: DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
@@ -105,7 +107,7 @@ export function registerEntityTools(
     {
       title: "Add entity reference",
       description:
-        "Attach an uploaded image file (vg_file_...) as a reference on an entity. For new PRODUCT/ACTOR entities, call this right after create_entity with isDefault: true so the entity has a usable thumbnail and generation reference.",
+        "Attach an uploaded file (vg_file_...) as a reference on an entity. Images work for every entity type. Slideshow themes may also attach a PDF or PowerPoint. Built-in entities cannot have references added. For new PRODUCT/ACTOR entities, call this right after create_entity with isDefault: true so the entity has a usable thumbnail and generation reference.",
       inputSchema: addEntityReferenceInputSchema,
       outputSchema: entityOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -118,7 +120,8 @@ export function registerEntityTools(
     "remove_entity_reference",
     {
       title: "Remove entity reference",
-      description: "Detach a reference image from an entity by file id.",
+      description:
+        "Detach a reference image from an entity by file id. Built-in entities cannot have references removed.",
       inputSchema: removeEntityReferenceInputSchema,
       outputSchema: entityOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,

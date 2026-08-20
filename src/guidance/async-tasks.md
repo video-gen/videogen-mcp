@@ -22,7 +22,21 @@ Shared statuses: `pending`, `running`, `succeeded`, `failed`, `cancelled`.
 
 `succeeded`, `failed`, and `cancelled` are **terminal**. Stop polling once you see one.
 
-### Step 3 — Hosted vs local wait behavior
+### Step 3 — Set an honest time expectation
+
+Tell the user a realistic wait **before or as you start**. Do not imply the result will appear in a few seconds. A healthy `pending` / `running` job is expected, not a stall.
+
+| Work | Typical wall time |
+| --- | --- |
+| `generate_image` and other still-image tools | about 15–60 seconds |
+| `generate_video_clip` | about 1–3 minutes (HIGH/MAX can be longer) |
+| `generate_motion_graphic` | about 2–5 minutes (writes animation code, then renders; complex prompts can take longer) |
+| `generate_avatar`, `generate_music` | often a few minutes |
+| Full workflows (`script_to_video`, …) and `export_project` | several minutes |
+
+Keep polling calmly. Quote `progressPercentage` when present. Do not start a second generation just because the first one is still running.
+
+### Step 4 — Hosted vs local wait behavior
 
 Composite start tools may poll internally for a while.
 
@@ -40,7 +54,7 @@ When the snapshot is non-terminal, continue with the matching get tool:
 
 Tell the user progress from `progressPercentage` when present. Retry get tools every few seconds until terminal (or until the user cancels).
 
-### Step 4 — Cancel when asked
+### Step 5 — Cancel when asked
 
 - Workflow: `cancel_workflow_run`
 - Tool: `cancel_tool_execution`

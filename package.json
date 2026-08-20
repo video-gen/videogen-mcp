@@ -1,6 +1,6 @@
 {
   "name": "@videogen/mcp",
-  "version": "2.0.18",
+  "version": "2.1.0",
   "description": "Model Context Protocol server for the VideoGen API. Generate videos, images, voiceovers, and more from any MCP client.",
   "license": "MIT",
   "type": "module",
@@ -17,19 +17,21 @@
     "build": "tsup && tsup --config tsup.widget.config.ts",
     "build:js": "tsup && tsup --config tsup.widget.config.ts",
     "build:widget": "tsup --config tsup.widget.config.ts",
+    "dev": "pnpm build && concurrently --kill-others --names build,server \"tsup --watch\" \"pnpm start:http:watch\"",
     "typecheck": "tsc --noEmit && tsc -p web/tsconfig.json --noEmit",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "clean": "rm -rf dist *.tsbuildinfo",
     "start": "node dist/index.js",
     "start:http": "VIDEOGEN_BASE_URL=\"${VIDEOGEN_BASE_URL:-http://localhost:4010}\" VIDEOGEN_OAUTH_ISSUER=\"${VIDEOGEN_OAUTH_ISSUER:-http://127.0.0.1:54321/auth/v1}\" node dist/http.js",
+    "start:http:watch": "VIDEOGEN_BASE_URL=\"${VIDEOGEN_BASE_URL:-http://localhost:4010}\" VIDEOGEN_OAUTH_ISSUER=\"${VIDEOGEN_OAUTH_ISSUER:-http://127.0.0.1:54321/auth/v1}\" node --watch dist/http.js",
     "smoke": "node dist/smoke.js",
     "pretest": "pnpm build",
     "test": "node --import ./test/register.mjs --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@videogen/sdk": "^2.0.18",
+    "@videogen/sdk": "^2.1.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -38,6 +40,7 @@
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "@typescript/native": "npm:typescript@^7.0.2",
+    "concurrently": "^7.6.0",
     "eslint": "^9.14.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",

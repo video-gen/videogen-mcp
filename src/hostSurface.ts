@@ -109,7 +109,9 @@ For consistent actors/products/styles: upload an image, create_entity, add_entit
 
 Before non-trivial setup, async polling, workflow/remix/export, or tools-vs-workflows decisions, call the matching guidance tool (get_getting_started_guidance, get_async_tasks_guidance, get_workflows_guidance, or get_tools_vs_workflows_guidance). Those tools mirror the guidance:// MCP resources for clients that do not read resources.
 
-On the hosted server, long operations may return a still-running snapshot; continue with get_workflow_run, get_tool_execution, or get_project_export.`;
+Generation is not instant. Tell the user a realistic wait before or as you start, then keep polling calmly — a healthy in-progress job is expected, not a stall. Typical wall times: images about 15–60 seconds; video clips about 1–3 minutes (HIGH/MAX can be longer); motion graphics about 2–5 minutes because they write animation code and then render (complex prompts can take longer); avatars and music often a few minutes; full workflows several minutes. Do not imply a clip will be ready in a few seconds.
+
+On the hosted server, long operations may return a still-running snapshot within about 90 seconds; continue with get_workflow_run, get_tool_execution, or get_project_export.`;
 
   if (hostSurface === "CHATGPT_APP") {
     return `${shared}

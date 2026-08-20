@@ -35,9 +35,6 @@ export function registerProjectTools(
   { respondSdk, runComposite }: McpOperations,
   mediaPreviewMeta: MediaPreviewToolMeta | null,
 ): void {
-  const mediaPreviewToolFields =
-    mediaPreviewMeta != null ? { _meta: mediaPreviewMeta } : {};
-
   server.registerTool(
     "list_projects",
     {
@@ -68,11 +65,11 @@ export function registerProjectTools(
     "export_project",
     {
       title: "Export project",
-      description: "Export a project to an MP4 and return its status or download URL.",
+      description:
+        "Export a project to an MP4 and return its status or download URL. Renders often take a few minutes. Tell the user that wait up front.",
       inputSchema: exportProjectInputSchema,
       outputSchema: exportProjectOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) => {
       const { projectId } = args;
@@ -85,10 +82,13 @@ export function registerProjectTools(
         poll: (exportId) => getClient().projects.getProjectExport({ projectId, exportId }),
         idKey: "exportId",
         controls: {},
+        attachMediaPreviewWidget: mediaPreviewMeta != null,
       });
     },
   );
 
+  // Same as get_tool_execution: poll snapshots must not declare a widget on the
+  // tool, or ChatGPT renders an empty preview for every in-progress check.
   server.registerTool(
     "get_project_export",
     {
@@ -98,14 +98,15 @@ export function registerProjectTools(
       inputSchema: getProjectExportInputSchema,
       outputSchema: projectExportOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
-      await respondSdk(() =>
-        getClient().projects.getProjectExport({
-          projectId: args.projectId,
-          exportId: args.exportId,
-        }),
+      await respondSdk(
+        () =>
+          getClient().projects.getProjectExport({
+            projectId: args.projectId,
+            exportId: args.exportId,
+          }),
+        { attachMediaPreviewWidget: true },
       ),
   );
 

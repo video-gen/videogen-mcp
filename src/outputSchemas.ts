@@ -417,17 +417,21 @@ const entitySchema = z
   .object({
     entityId: z.string().describe("Entity id (vg_enti_...)."),
     entityType: z
-      .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE"])
-      .describe("ACTOR, PRODUCT, or VISUAL_STYLE."),
+      .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE", "SLIDESHOW_THEME"])
+      .describe("ACTOR, PRODUCT, VISUAL_STYLE, or SLIDESHOW_THEME."),
     name: z.string().describe("Display name."),
     description: z.string().describe("Description (empty when unset)."),
     actorConfig: entityActorConfigSchema.optional(),
     references: z.array(entityReferenceSchema).describe("Attached reference images."),
     createdAt: z.number().describe("Unix created-at timestamp."),
     updatedAt: z.number().describe("Unix updated-at timestamp."),
+    isBuiltIn: z
+      .boolean()
+      .optional()
+      .describe("True for VideoGen catalog entities that cannot be modified."),
   })
   .passthrough()
-  .describe("A reusable actor, product, or visual style entity.");
+  .describe("A reusable actor, product, visual style, or slideshow theme entity.");
 
 export const entityOutputSchema = entitySchema;
 

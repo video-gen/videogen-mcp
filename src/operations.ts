@@ -160,12 +160,16 @@ export type McpOAuthContext = {
  * than an opaque error.
  */
 export type McpOperations = {
-  respondSdk: (call: () => Promise<unknown>) => Promise<CallToolResult>;
+  respondSdk: (
+    call: () => Promise<unknown>,
+    options?: { attachMediaPreviewWidget?: boolean },
+  ) => Promise<CallToolResult>;
   runComposite: (args: {
     start: () => Promise<unknown>;
     poll: (id: string) => Promise<unknown>;
     idKey: "workflowRunId" | "toolExecutionId" | "exportId";
     controls: PollControls;
+    attachMediaPreviewWidget?: boolean;
   }) => Promise<CallToolResult>;
   awaitReady: (args: {
     poll: () => Promise<unknown>;
@@ -264,14 +268,19 @@ export function createMcpOperations(
     });
   };
 
-  const respondSdk = async (call: () => Promise<unknown>): Promise<CallToolResult> => {
+  const respondSdk = async (
+    call: () => Promise<unknown>,
+    options?: { attachMediaPreviewWidget?: boolean },
+  ): Promise<CallToolResult> => {
     const challenge = missingCredentialsChallenge();
     if (challenge != null) {
       return challenge;
     }
 
     try {
-      return jsonResult(await call());
+      return jsonResult(await call(), {
+        attachMediaPreviewWidget: options?.attachMediaPreviewWidget === true,
+      });
     } catch (err: unknown) {
       return toErrorResult(err);
     }
@@ -282,11 +291,16 @@ export function createMcpOperations(
     poll: (id: string) => Promise<unknown>;
     idKey: "workflowRunId" | "toolExecutionId" | "exportId";
     controls: PollControls;
+    attachMediaPreviewWidget?: boolean;
   }): Promise<CallToolResult> => {
     const challenge = missingCredentialsChallenge();
     if (challenge != null) {
       return challenge;
     }
+
+    const jsonOptions = {
+      attachMediaPreviewWidget: args.attachMediaPreviewWidget === true,
+    };
 
     try {
       const started = await args.start();
@@ -294,7 +308,7 @@ export function createMcpOperations(
       const shouldWait = args.controls.wait ?? maxWaitMs == null;
 
       if (!shouldWait || id == null) {
-        return jsonResult(started);
+        return jsonResult(started, jsonOptions);
       }
 
       const intervalMs = args.controls.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -311,7 +325,7 @@ export function createMcpOperations(
         snapshot = await args.poll(id);
       }
 
-      return jsonResult(snapshot);
+      return jsonResult(snapshot, jsonOptions);
     } catch (err: unknown) {
       return toErrorResult(err);
     }

@@ -40,12 +40,18 @@ type UpscaleImageInput = z.infer<typeof upscaleImageInputSchema>;
 type UpscaleVideoInput = z.infer<typeof upscaleVideoInputSchema>;
 type Image3dEffectInput = z.infer<typeof image3dEffectInputSchema>;
 
+const mcpMediaDefaults = {
+  numResults: 1 as const,
+  isOutputTemporary: false as const,
+  hideFromUi: false as const,
+};
+
 export function toGenerateImageRequest(input: GenerateImageInput): GenerateImageRequest {
   return {
     prompt: input.prompt,
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
+    ...(input.entityIds != null && { entityIds: input.entityIds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
   };
@@ -55,13 +61,18 @@ export function toGenerateVideoClipRequest(
   input: GenerateVideoClipInput,
 ): GenerateVideoClipRequest {
   return {
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
+    generateAudio: input.generateAudio ?? false,
+    ...(input.suppressBackgroundMusic != null && {
+      suppressBackgroundMusic: input.suppressBackgroundMusic,
+    }),
     ...(input.prompt != null && { prompt: input.prompt }),
+    ...(input.startFrameFileId != null && { startFrameFileId: input.startFrameFileId }),
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
     ...(input.videoFileIds != null && { videoFileIds: input.videoFileIds }),
     ...(input.audioFileIds != null && { audioFileIds: input.audioFileIds }),
-    ...(input.generateAudio != null && { generateAudio: input.generateAudio }),
+    ...(input.spokenDialogue != null && { spokenDialogue: input.spokenDialogue }),
+    ...(input.voiceDescription != null && { voiceDescription: input.voiceDescription }),
     ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
@@ -72,8 +83,7 @@ export function toTextToSpeechRequest(input: TextToSpeechInput): TextToSpeechReq
   return {
     ttsText: input.text,
     voiceId: input.voiceId,
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
     ...(input.language != null && { speechLanguageCode: input.language }),
     ...(input.speed != null && { voiceSpeed: input.speed }),
   };
@@ -84,8 +94,7 @@ export function toGenerateSoundEffectRequest(
 ): GenerateSoundEffectRequest {
   return {
     prompt: input.prompt,
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
     ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
   };
 }
@@ -93,8 +102,7 @@ export function toGenerateSoundEffectRequest(
 export function toGenerateMusicRequest(input: GenerateMusicInput): GenerateMusicRequest {
   return {
     prompt: input.prompt,
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
   };
 }
 
@@ -103,12 +111,28 @@ export function toGenerateMotionGraphicRequest(
 ): GenerateMotionGraphicRequest {
   return {
     prompt: input.prompt,
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
     ...(input.fileIds != null && { fileIds: input.fileIds }),
+    ...(input.entityIds != null && { entityIds: input.entityIds }),
     ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     transparentBackground: input.transparentBackground ?? true,
+    ...(input.subToolModes != null && {
+      subToolModes: {
+        ...(input.subToolModes.generateImages != null && {
+          generateImages: input.subToolModes.generateImages,
+        }),
+        ...(input.subToolModes.generateVideoClips != null && {
+          generateVideoClips: input.subToolModes.generateVideoClips,
+        }),
+        ...(input.subToolModes.generateVoiceover != null && {
+          generateVoiceover: input.subToolModes.generateVoiceover,
+        }),
+        ...(input.subToolModes.searchStockMedia != null && {
+          searchStockMedia: input.subToolModes.searchStockMedia,
+        }),
+      },
+    }),
   };
 }
 
@@ -116,36 +140,35 @@ export function toGenerateAvatarRequest(input: GenerateAvatarInput): GenerateAva
   return {
     actorEntityId: input.actorEntityId,
     audioFileId: input.audioFileId,
-    numResults: 1,
-    isOutputTemporary: false,
+    ...mcpMediaDefaults,
     ...(input.avatarQuality != null && { avatarQuality: input.avatarQuality }),
   };
 }
 
 export function toVectorizeImageRequest(input: VectorizeImageInput): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, numResults: 1, isOutputTemporary: false };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
 }
 
 export function toRemoveImageBackgroundRequest(
   input: RemoveImageBackgroundInput,
 ): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, numResults: 1, isOutputTemporary: false };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
 }
 
 export function toRemoveVideoBackgroundRequest(
   input: RemoveVideoBackgroundInput,
 ): VideoAssetRequest {
-  return { videoFileId: input.videoFileId, numResults: 1, isOutputTemporary: false };
+  return { videoFileId: input.videoFileId, ...mcpMediaDefaults };
 }
 
 export function toUpscaleImageRequest(input: UpscaleImageInput): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, numResults: 1, isOutputTemporary: false };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
 }
 
 export function toUpscaleVideoRequest(input: UpscaleVideoInput): VideoAssetRequest {
-  return { videoFileId: input.videoFileId, numResults: 1, isOutputTemporary: false };
+  return { videoFileId: input.videoFileId, ...mcpMediaDefaults };
 }
 
 export function toImage3dEffectRequest(input: Image3dEffectInput): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, numResults: 1, isOutputTemporary: false };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
 }

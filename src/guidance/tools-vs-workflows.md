@@ -52,12 +52,12 @@ Workflows go further: they orchestrate script/timing, visuals, narration, captio
 ### Generate
 
 - `generate_image` — still images from text (and related image flows per tool schema)
-- `generate_video_clip` — short standalone video clip (up to about 15 seconds)
+- `generate_video_clip` — short standalone video clip (up to about 30 seconds)
 - `text_to_speech` — voiceover audio from text
 - `generate_sound_effect` — SFX from a text description
 - `generate_music` — music bed
 - `generate_avatar` — talking-head / avatar clip from audio + actor source
-- `generate_motion_graphic` — motion graphic generation when exposed by the tool schema
+- `generate_motion_graphic` — motion graphic generation when exposed by the tool schema. Typically 2–5 minutes (code + render); tell the user that wait before starting.
 
 ### Transform
 

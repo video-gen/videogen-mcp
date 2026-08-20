@@ -47,9 +47,16 @@ import {
 
 type MediaPreviewToolMeta = typeof MEDIA_PREVIEW_TOOL_META;
 
-const pollToTerminal = (getClient: GetVideoGenClient) => ({
+const pollToTerminal = ({
+  getClient,
+  attachMediaPreviewWidget,
+}: {
+  getClient: GetVideoGenClient;
+  attachMediaPreviewWidget: boolean;
+}) => ({
   poll: (toolExecutionId: string) => getClient().tools.getToolExecutionInfo({ toolExecutionId }),
   idKey: "toolExecutionId" as const,
+  attachMediaPreviewWidget,
 });
 
 export function registerMediaToolTools(
@@ -58,24 +65,29 @@ export function registerMediaToolTools(
   { respondSdk, runComposite }: McpOperations,
   mediaPreviewMeta: MediaPreviewToolMeta | null,
 ): void {
-  const mediaPreviewToolFields =
-    mediaPreviewMeta != null ? { _meta: mediaPreviewMeta } : {};
+  // Do not put openai/outputTemplate on generate_* tool descriptors. ChatGPT
+  // would render an empty preview as soon as generation starts, then another
+  // on every get_tool_execution poll. Attach the widget on the result only
+  // once signed media URLs exist.
+  const mediaGeneration = pollToTerminal({
+    getClient,
+    attachMediaPreviewWidget: mediaPreviewMeta != null,
+  });
 
   server.registerTool(
     "generate_image",
     {
       title: "Generate image",
       description:
-        "Generate an image from a text prompt, optionally conditioned on source images (image-to-image).",
+        "Generate an image from a text prompt, optionally conditioned on source images (image-to-image) and actor, product, or visual-style entity ids. Typically takes 15–60 seconds. Tell the user that wait up front.",
       inputSchema: generateImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.generateImage(toGenerateImageRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -85,16 +97,15 @@ export function registerMediaToolTools(
     {
       title: "Generate video clip",
       description:
-        "Generate a video clip from a text prompt, source images, or source videos. quality is optional (STANDARD, HIGH, or MAX; LOW is not supported).",
+        "Generate a video clip from a text prompt, source images, source videos, spokenDialogue, or reference audio. quality is optional (LOW, STANDARD, HIGH, or MAX). Typically takes 1–3 minutes (HIGH/MAX can be longer). Tell the user that wait up front and keep polling calmly.",
       inputSchema: generateVideoClipInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.generateVideoClip(toGenerateVideoClipRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -107,12 +118,11 @@ export function registerMediaToolTools(
       inputSchema: textToSpeechInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.textToSpeech(toTextToSpeechRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -125,12 +135,11 @@ export function registerMediaToolTools(
       inputSchema: generateSoundEffectInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.generateSoundEffect(toGenerateSoundEffectRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -139,16 +148,16 @@ export function registerMediaToolTools(
     "generate_music",
     {
       title: "Generate music",
-      description: "Generate a music track from a text prompt.",
+      description:
+        "Generate a music track from a text prompt. Typically takes 1–5 minutes depending on track length. Tell the user that wait up front.",
       inputSchema: generateMusicInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.generateMusic(toGenerateMusicRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -158,16 +167,15 @@ export function registerMediaToolTools(
     {
       title: "Generate motion graphic",
       description:
-        "Generate an animated motion graphic video from a text prompt. Best for precise text animations (typing effects, kinetic typography, lower thirds) that stock or generated footage can't express. Outputs a transparent WebM overlay by default; set transparentBackground to false for an opaque MP4. Optionally pass reference media file ids to display or animate.",
+        "Generate an animated motion graphic video from a text prompt. Best for precise text animations (typing effects, kinetic typography, lower thirds) that stock or generated footage can't express. Outputs a transparent WebM overlay by default; set transparentBackground to false for an opaque MP4. Optionally pass reference media file ids to display or animate. Typically takes 2–5 minutes because VideoGen writes animation code and then renders it; complex prompts can take longer. Tell the user that wait before starting and keep polling calmly — a healthy in-progress job is expected.",
       inputSchema: generateMotionGraphicInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.generateMotionGraphic(toGenerateMotionGraphicRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -177,16 +185,15 @@ export function registerMediaToolTools(
     {
       title: "Generate avatar",
       description:
-        "Generate a talking-head avatar video from an ACTOR entity and an uploaded audio file. Pass actorEntityId and optionally set avatarQuality.",
+        "Generate a talking-head avatar video from an ACTOR entity and an uploaded audio file. Pass actorEntityId and optionally set avatarQuality. Typically takes a few minutes (longer for longer audio). Tell the user that wait up front.",
       inputSchema: generateAvatarInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.generateAvatar(toGenerateAvatarRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -199,12 +206,11 @@ export function registerMediaToolTools(
       inputSchema: vectorizeImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.vectorizeImage(toVectorizeImageRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -217,13 +223,12 @@ export function registerMediaToolTools(
       inputSchema: removeImageBackgroundInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () =>
           getClient().tools.removeImageBackground(toRemoveImageBackgroundRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -236,13 +241,12 @@ export function registerMediaToolTools(
       inputSchema: removeVideoBackgroundInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () =>
           getClient().tools.removeVideoBackground(toRemoveVideoBackgroundRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -255,12 +259,11 @@ export function registerMediaToolTools(
       inputSchema: upscaleImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.upscaleImage(toUpscaleImageRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -273,12 +276,11 @@ export function registerMediaToolTools(
       inputSchema: upscaleVideoInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.upscaleVideo(toUpscaleVideoRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -291,12 +293,11 @@ export function registerMediaToolTools(
       inputSchema: image3dEffectInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
       await runComposite({
         start: () => getClient().tools.image3dEffect(toImage3dEffectRequest(args)),
-        ...pollToTerminal(getClient),
+        ...mediaGeneration,
         controls: {},
       }),
   );
@@ -314,6 +315,9 @@ export function registerMediaToolTools(
       await respondSdk(() => getClient().tools.listToolExecutions(dropUndefined(args))),
   );
 
+  // No tool-level outputTemplate: ChatGPT polls this while generation is still
+  // running, and a descriptor-level widget would spawn an empty preview on every
+  // poll. Attach the widget on the result only once media URLs exist.
   server.registerTool(
     "get_tool_execution",
     {
@@ -322,11 +326,11 @@ export function registerMediaToolTools(
       inputSchema: getToolExecutionInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) =>
-      await respondSdk(() =>
-        getClient().tools.getToolExecutionInfo({ toolExecutionId: args.toolExecutionId }),
+      await respondSdk(
+        () => getClient().tools.getToolExecutionInfo({ toolExecutionId: args.toolExecutionId }),
+        { attachMediaPreviewWidget: true },
       ),
   );
 

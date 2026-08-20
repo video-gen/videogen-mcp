@@ -18,7 +18,7 @@ Workflows create an editable **project** and run the full generation pipeline. T
 | An audio voiceover file | `voiceover_to_video` | `fileId` (uploaded audio), optional `style`, `aspectRatio` |
 | A PDF or PowerPoint | `slideshow_to_video` | `fileId` (uploaded deck) |
 | Short, tightly directed **shot list** (user wants frame-by-frame control) | `storyboard_to_video` | `scenes` (visual prompt + optional spoken words per scene) |
-| One short clip idea (up to ~15s) as a project | `prompt_to_video_clip` | `prompt`, optional reference image file ids |
+| One short clip idea (up to ~30s) as a project | `prompt_to_video_clip` | `prompt`, optional reference image file ids |
 
 #### Script vs storyboard (credits and length)
 
@@ -51,6 +51,7 @@ Call `remix_project` with `projectId` and ordered `edits`:
 | `CAPTIONS` | Show / enable captions |
 | `TRANSITIONS` | Add section and asset transitions |
 | `ANIMATE_IMAGES` | Convert still images into short video clips |
+| `ZOOM` | Apply a Ken Burns zoom to still images |
 
 Pass `saveAsNewProject: true` to edit a copy and leave the original alone.
 
@@ -95,17 +96,17 @@ Pass ordered `scenes`. Each scene needs a visual prompt; spoken words are option
 
 ### Prompt to video clip (`prompt_to_video_clip`)
 
-One short AI clip inside an editable project (duration up to about 15 seconds). For a **standalone** clip with no project pipeline, prefer the media tool `generate_video_clip` instead (see tools-vs-workflows guidance).
+One short AI clip inside an editable project (duration up to about 30 seconds; clamped to the selected quality's supported range). For a **standalone** clip with no project pipeline, prefer the media tool `generate_video_clip` instead (see tools-vs-workflows guidance).
 
 ---
 
 ## Remix notes
 
-MCP `remix_project` exposes a curated subset of remix actions as `edits`. The full REST API supports more action types (music file, logo file, translate, upscale, and others) via `POST /v1/projects/{projectId}/remix`. If the user needs an edit that is not `CAPTIONS` / `TRANSITIONS` / `ANIMATE_IMAGES`, say so and point them at the REST/SDK remix API or the VideoGen editor (`projectUrl` / `get_app_deep_link`).
+MCP `remix_project` exposes a curated subset of remix actions as `edits`. The full REST API supports more action types (music file, logo file, translate, upscale, and others) via `POST /v1/projects/{projectId}/remix`. If the user needs an edit that is not `CAPTIONS` / `TRANSITIONS` / `ANIMATE_IMAGES` / `ZOOM`, say so and point them at the REST/SDK remix API or the VideoGen editor (`projectUrl` / `get_app_deep_link`).
 
 When starting a workflow through the REST SDK, callers often pass `remixActions` in the same request so polish runs after build. MCP workflow tools focus on creation; apply polish with `remix_project` after success unless the specific workflow tool documents inline remix fields.
 
-Recommended polish pairs (when using full REST remix types): captions + animate images for script-led videos; transitions + animate images for slideshows. With MCP edits, prefer at least two of `CAPTIONS`, `TRANSITIONS`, and `ANIMATE_IMAGES` when the user wants a finished-looking cut.
+Recommended polish pairs (when using full REST remix types): captions + animate images for script-led videos; transitions + animate images for slideshows. With MCP edits, prefer at least two of `CAPTIONS`, `TRANSITIONS`, `ANIMATE_IMAGES`, and `ZOOM` when the user wants a finished-looking cut.
 
 ---
 

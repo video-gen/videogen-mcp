@@ -117,7 +117,7 @@ Operational manuals exposed as MCP resources and mirror tools (no API credential
 
 Call the matching `get_*_guidance` tool before non-trivial setup, polling, workflow/remix/export, or tools-vs-workflows decisions. Many hosts never auto-attach resources; the tools are the reliable path. Content is grounded in the public docs at [docs.videogen.io](https://docs.videogen.io) but written for MCP tool usage (including hosted wait caps).
 
-Creative MCP tools expose user intent rather than the lower-level developer API request shape. Use `style` for a plain-language visual style and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }`) for output dimensions. Omitted workflow styles use AI-generated images with a cinematic photo-real look. `remix_project` accepts curated `edits`: `CAPTIONS`, `TRANSITIONS`, and `ANIMATE_IMAGES`.
+Creative MCP tools expose user intent rather than the lower-level developer API request shape. Use `style` for a plain-language visual style and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }`) for output dimensions. Omitted workflow styles use AI-generated images with a cinematic photo-real look. `remix_project` accepts curated `edits`: `CAPTIONS`, `TRANSITIONS`, `ANIMATE_IMAGES`, and `ZOOM`.
 
 Workflow, media-generation, and export tools start the operation and poll internally. On the **hosted** (Streamable HTTP) server, the wait window is capped under Cloudflare's proxy timeout, so long generations return a still-running snapshot instead of a 524. Use `get_tool_execution`, `get_workflow_run`, or `get_project_export` to continue polling.
 

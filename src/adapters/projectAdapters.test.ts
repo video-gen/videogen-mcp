@@ -20,7 +20,7 @@ describe("project MCP adapters", () => {
     assert.deepEqual(
       toRemixProjectRequest({
         projectId: "vg_project_1",
-        edits: ["CAPTIONS", "TRANSITIONS", "ANIMATE_IMAGES"],
+        edits: ["CAPTIONS", "TRANSITIONS", "ZOOM", "ANIMATE_IMAGES"],
       }),
       {
         remixActions: [
@@ -30,6 +30,7 @@ describe("project MCP adapters", () => {
             sectionTransition: "DYNAMIC",
             assetTransition: "DYNAMIC",
           },
+          { type: "ADD_ZOOM" },
           { type: "CONVERT_IMAGES_TO_VIDEOS" },
         ],
       },

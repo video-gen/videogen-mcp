@@ -22,11 +22,16 @@ type SlideshowToVideoInput = z.infer<typeof slideshowToVideoInputSchema>;
 type StoryboardToVideoInput = z.infer<typeof storyboardToVideoInputSchema>;
 type PromptToVideoClipInput = z.infer<typeof promptToVideoClipInputSchema>;
 
+const mcpWorkflowDefaults = {
+  isOutputTemporary: false as const,
+  hideFromUi: false as const,
+};
+
 export function toScriptToVideoRequest(input: ScriptToVideoInput): ScriptToVideoRequest {
   return {
     script: input.script,
     visualStyle: styleToVisualStyle({ style: input.style }),
-    isOutputTemporary: false,
+    ...mcpWorkflowDefaults,
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
     ...(input.language != null && { language: input.language }),
@@ -42,7 +47,7 @@ export function toVoiceoverToVideoRequest(
   return {
     fileId: input.fileId,
     visualStyle: styleToVisualStyle({ style: input.style }),
-    isOutputTemporary: false,
+    ...mcpWorkflowDefaults,
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
     ...(input.language != null && { language: input.language }),
@@ -54,13 +59,16 @@ export function toSlideshowToVideoRequest(
 ): SlideshowToVideoRequest {
   return {
     fileId: input.fileId,
-    isOutputTemporary: false,
+    ...mcpWorkflowDefaults,
     ...(input.slideScripts != null && { slideScripts: input.slideScripts }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.language != null && { language: input.language }),
     ...(input.voiceId != null && { voiceId: input.voiceId }),
     ...(input.actorEntityId != null && { actorEntityId: input.actorEntityId }),
     ...(input.avatarQuality != null && { avatarQuality: input.avatarQuality }),
+    ...(input.slideshowThemeEntityId != null && {
+      slideshowThemeEntityId: input.slideshowThemeEntityId,
+    }),
   };
 }
 
@@ -75,7 +83,7 @@ export function toStoryboardToVideoRequest(
       ...(scene.durationSeconds != null && { durationSeconds: scene.durationSeconds }),
     })),
     defaultGeneration: { aiStyle: input.style ?? DEFAULT_MCP_AI_STYLE },
-    isOutputTemporary: false,
+    ...mcpWorkflowDefaults,
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
   };
@@ -86,7 +94,7 @@ export function toPromptToVideoClipRequest(
 ): PromptToVideoClipRequest {
   return {
     prompt: input.prompt,
-    isOutputTemporary: false,
+    ...mcpWorkflowDefaults,
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
     ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),

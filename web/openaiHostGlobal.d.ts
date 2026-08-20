@@ -23,7 +23,7 @@ export type OpenAiHost = {
   setWidgetState?: (state: Record<string, unknown>) => Promise<void> | void;
   sendFollowUpMessage?: (args: { prompt: string }) => Promise<void> | void;
   toolOutput?: unknown;
-  openExternal?: (args: { href: string }) => void;
+  openExternal?: (args: { href: string; redirectUrl?: boolean }) => void;
 };
 
 declare global {

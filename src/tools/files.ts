@@ -214,6 +214,10 @@ export function registerFileTools(
       ),
   );
 
+  // Do not attach the media-preview widget here. The ChatGPT preview iframe
+  // rehydrates signed URLs by calling get_file via `window.openai.callTool`;
+  // an outputTemplate on this tool would spawn a new empty widget in the chat
+  // for every rehydrate.
   server.registerTool(
     "get_file",
     {
@@ -223,7 +227,6 @@ export function registerFileTools(
       inputSchema: getFileInputSchema,
       outputSchema: fileOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
-      ...mediaPreviewToolFields,
     },
     async (args) => {
       if (args.wait === true) {

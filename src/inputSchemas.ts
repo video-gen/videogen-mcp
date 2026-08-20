@@ -212,9 +212,9 @@ export const listLanguagesInputSchema = {
 };
 
 const entityTypeField = z
-  .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE"])
+  .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE", "SLIDESHOW_THEME"])
   .describe(
-    "ACTOR = consistent character; PRODUCT = product/object; VISUAL_STYLE = look/style for generated images.",
+    "ACTOR = consistent character; PRODUCT = product/object; VISUAL_STYLE = look/style for generated images; SLIDESHOW_THEME = shared slide design system for a slideshow deck.",
   );
 
 const entityIdField = z.string().describe("Entity id (vg_enti_...).");

@@ -21,6 +21,8 @@ function remixEditToAction(edit: RemixEdit): Schemas["RemixAction"] {
       };
     case "ANIMATE_IMAGES":
       return { type: "CONVERT_IMAGES_TO_VIDEOS" };
+    case "ZOOM":
+      return { type: "ADD_ZOOM" };
   }
 }
 

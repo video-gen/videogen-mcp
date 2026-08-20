@@ -16,7 +16,11 @@ import {
   toVectorizeImageRequest,
 } from "./mediaToolAdapters";
 
-const persistentSingleResult = { numResults: 1, isOutputTemporary: false };
+const persistentSingleResult = {
+  numResults: 1,
+  isOutputTemporary: false,
+  hideFromUi: false,
+};
 
 describe("media MCP adapters", () => {
   it("maps generative image and video inputs", () => {
@@ -24,10 +28,12 @@ describe("media MCP adapters", () => {
       toGenerateImageRequest({
         prompt: "A premium product photo.",
         aspectRatio: { width: 9, height: 16 },
+        entityIds: ["vg_enti_actor"],
       }),
       {
         prompt: "A premium product photo.",
         aspectRatio: { width: 9, height: 16 },
+        entityIds: ["vg_enti_actor"],
         ...persistentSingleResult,
       },
     );
@@ -36,11 +42,13 @@ describe("media MCP adapters", () => {
       toGenerateVideoClipRequest({
         prompt: "A slow product push-in.",
         generateAudio: true,
+        suppressBackgroundMusic: true,
         durationSeconds: 6,
       }),
       {
         prompt: "A slow product push-in.",
         generateAudio: true,
+        suppressBackgroundMusic: true,
         durationSeconds: 6,
         ...persistentSingleResult,
       },
@@ -53,6 +61,33 @@ describe("media MCP adapters", () => {
       }),
       {
         imageFileIds: ["vg_file_image"],
+        generateAudio: false,
+        ...persistentSingleResult,
+      },
+    );
+
+    assert.deepEqual(
+      toGenerateVideoClipRequest({
+        startFrameFileId: "vg_file_start",
+      }),
+      {
+        startFrameFileId: "vg_file_start",
+        generateAudio: false,
+        ...persistentSingleResult,
+      },
+    );
+
+    assert.deepEqual(
+      toGenerateVideoClipRequest({
+        spokenDialogue: "Meet your new everyday lip tint.",
+        voiceDescription: "A warm, confident young woman's voice",
+        audioFileIds: ["vg_file_audio"],
+      }),
+      {
+        spokenDialogue: "Meet your new everyday lip tint.",
+        voiceDescription: "A warm, confident young woman's voice",
+        audioFileIds: ["vg_file_audio"],
+        generateAudio: false,
         ...persistentSingleResult,
       },
     );
@@ -98,10 +133,14 @@ describe("media MCP adapters", () => {
       toGenerateMotionGraphicRequest({
         prompt: "Animate a full-frame title card.",
         transparentBackground: false,
+        subToolModes: { generateImages: "DISABLED" },
+        entityIds: ["vg_enti_actor"],
       }),
       {
         prompt: "Animate a full-frame title card.",
         transparentBackground: false,
+        subToolModes: { generateImages: "DISABLED" },
+        entityIds: ["vg_enti_actor"],
         ...persistentSingleResult,
       },
     );

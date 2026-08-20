@@ -34,6 +34,13 @@ import {
   buildResourceMetadataUrl,
   buildWwwAuthenticateChallenge,
 } from "./oauthProtectedResource";
+import {
+  MCP_ANONYMOUS_DISCOVERY_LIMIT_PER_MINUTE,
+  MCP_ANONYMOUS_NOAUTH_TOOL_LIMIT_PER_MINUTE,
+  MCP_METADATA_LIMIT_PER_MINUTE,
+  consumeRateLimit,
+  getClientIp,
+} from "./rateLimit";
 import { resolveMcpUpstreamClientId } from "./resolveMcpUpstreamClientId";
 import { mirrorSecuritySchemesToTopLevel } from "./securitySchemes";
 
@@ -68,6 +75,26 @@ function applyCorsHeaders(res: ServerResponse): void {
   );
   res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
   res.setHeader("Access-Control-Max-Age", "86400");
+}
+
+function consumeMetadataRateLimit(req: IncomingMessage, res: ServerResponse): boolean {
+  const metadataIp = getClientIp({
+    forwardedFor: req.headers["x-forwarded-for"],
+    socketAddress: req.socket.remoteAddress,
+  });
+
+  if (
+    consumeRateLimit({
+      key: `${metadataIp}:metadata`,
+      limit: MCP_METADATA_LIMIT_PER_MINUTE,
+      nowMs: Date.now(),
+    })
+  ) {
+    return true;
+  }
+
+  writeJson(res, 429, { error: "Too many requests. Try again in a minute." });
+  return false;
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -223,6 +250,31 @@ async function handleMcpPost(
   const mcpMethod = getMcpMethodFromBody(bodyResult.body);
   const hasAuthorization = token != null;
   const origin = getRequestOrigin(req);
+  const clientIp = getClientIp({
+    forwardedFor: req.headers["x-forwarded-for"],
+    socketAddress: req.socket.remoteAddress,
+  });
+
+  if (token == null) {
+    const isToolCall = mcpMethod === "tools/call";
+    const allowed = consumeRateLimit({
+      key: `${clientIp}:${isToolCall ? "noauth" : "discovery"}`,
+      limit: isToolCall
+        ? MCP_ANONYMOUS_NOAUTH_TOOL_LIMIT_PER_MINUTE
+        : MCP_ANONYMOUS_DISCOVERY_LIMIT_PER_MINUTE,
+      nowMs: Date.now(),
+    });
+
+    if (!allowed) {
+      writeJsonRpcError(res, 429, -32000, "Too many requests. Try again in a minute.");
+      logMcpRequest({
+        method: mcpMethod,
+        httpStatus: 429,
+        hasAuthorization,
+      });
+      return;
+    }
+  }
 
   // The standard `/mcp` endpoint is a protected resource: challenge every
   // credential-less request, including initialize and discovery, so conforming
@@ -478,6 +530,10 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
+    if (!consumeMetadataRateLimit(req, res)) {
+      return;
+    }
+
     writeJson(res, 200, metadata);
 
     return;
@@ -494,6 +550,10 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     if (config.oauthIssuer == null) {
       writeJsonRpcError(res, 404, -32601, "Not found.");
 
+      return;
+    }
+
+    if (!consumeMetadataRateLimit(req, res)) {
       return;
     }
 

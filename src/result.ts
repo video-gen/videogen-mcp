@@ -133,16 +133,27 @@ export function getHasInlineMediaUrls(data: unknown): boolean {
  * object also sets `structuredContent` so it can be validated against the tool's
  * `outputSchema` (required by MCP once an output schema is advertised).
  *
- * When the payload includes media download/thumbnail URLs, also tags the result
- * with the media-preview output template so ChatGPT hosts re-bind the widget.
+ * Media download/thumbnail URLs are enriched with `appMediaUrl`. The ChatGPT
+ * media-preview widget is attached only when `attachMediaPreviewWidget` is set
+ * AND the payload already has inline media URLs. Never declare
+ * `openai/outputTemplate` on a generate/poll tool descriptor — ChatGPT would
+ * spawn an empty preview on every in-progress call.
  */
-export function jsonResult(data: unknown): CallToolResult {
+export function jsonResult(
+  data: unknown,
+  options: { attachMediaPreviewWidget?: boolean } = {},
+): CallToolResult {
   const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
 
   if (getIsPlainJsonObject(data)) {
-    if (getHasInlineMediaUrls(data)) {
-      const structuredContent = enrichStructuredContentWithAppMediaUrls(data);
+    const structuredContent = getHasInlineMediaUrls(data)
+      ? enrichStructuredContentWithAppMediaUrls(data)
+      : data;
 
+    // Only attach the ChatGPT output template when the caller opts in and the
+    // payload already has media URLs. Descriptor-level templates spawn an empty
+    // widget on every in-progress generate/poll call.
+    if (options.attachMediaPreviewWidget === true && getHasInlineMediaUrls(data)) {
       return {
         content: [{ type: "text", text }],
         structuredContent,
@@ -150,7 +161,7 @@ export function jsonResult(data: unknown): CallToolResult {
       };
     }
 
-    return { content: [{ type: "text", text }], structuredContent: data };
+    return { content: [{ type: "text", text }], structuredContent };
   }
 
   return { content: [{ type: "text", text }] };

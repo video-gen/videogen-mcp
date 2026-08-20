@@ -8,18 +8,29 @@ import {
   toVoiceoverToVideoRequest,
 } from "./workflowAdapters";
 
+const mcpVisualStyle = {
+  type: "AI_IMAGE" as const,
+  aiStyle: "cinematic photo-real footage",
+  restyleFeaturedBRollWithAiStyle: true,
+};
+
+const mcpWorkflowDefaults = {
+  isOutputTemporary: false,
+  hideFromUi: false,
+};
+
 describe("workflow MCP adapters", () => {
   it("maps minimal script and voiceover inputs to persistent AI-image workflows", () => {
     assert.deepEqual(toScriptToVideoRequest({ script: "Hello world." }), {
       script: "Hello world.",
-      visualStyle: { type: "AI_IMAGE", aiStyle: "cinematic photo-real footage" },
-      isOutputTemporary: false,
+      visualStyle: mcpVisualStyle,
+      ...mcpWorkflowDefaults,
     });
 
     assert.deepEqual(toVoiceoverToVideoRequest({ fileId: "vg_file_audio" }), {
       fileId: "vg_file_audio",
-      visualStyle: { type: "AI_IMAGE", aiStyle: "cinematic photo-real footage" },
-      isOutputTemporary: false,
+      visualStyle: mcpVisualStyle,
+      ...mcpWorkflowDefaults,
     });
   });
 
@@ -29,12 +40,24 @@ describe("workflow MCP adapters", () => {
         fileId: "vg_file_slides",
         aspectRatio: { width: 9, height: 16 },
         voiceId: "vg_voice_1",
+        slideshowThemeEntityId: "vg_enti_theme",
       }),
       {
         fileId: "vg_file_slides",
         aspectRatio: { width: 9, height: 16 },
         voiceId: "vg_voice_1",
-        isOutputTemporary: false,
+        slideshowThemeEntityId: "vg_enti_theme",
+        ...mcpWorkflowDefaults,
+      },
+    );
+
+    assert.deepEqual(
+      toSlideshowToVideoRequest({
+        fileId: "vg_file_slides",
+      }),
+      {
+        fileId: "vg_file_slides",
+        ...mcpWorkflowDefaults,
       },
     );
 
@@ -48,7 +71,7 @@ describe("workflow MCP adapters", () => {
         prompt: "Lip tint rotating on a pedestal.",
         aspectRatio: { width: 1, height: 1 },
         durationSeconds: 5,
-        isOutputTemporary: false,
+        ...mcpWorkflowDefaults,
       },
     );
     assert.deepEqual(
@@ -58,9 +81,9 @@ describe("workflow MCP adapters", () => {
       }),
       {
         script: "Hello world.",
-        visualStyle: { type: "AI_IMAGE", aiStyle: "cinematic photo-real footage" },
+        visualStyle: mcpVisualStyle,
         aspectRatio: { width: 4, height: 5 },
-        isOutputTemporary: false,
+        ...mcpWorkflowDefaults,
       },
     );
   });
@@ -87,7 +110,7 @@ describe("workflow MCP adapters", () => {
         ],
         defaultGeneration: { aiStyle: "premium beauty campaign" },
         quality: "HIGH",
-        isOutputTemporary: false,
+        ...mcpWorkflowDefaults,
       },
     );
   });

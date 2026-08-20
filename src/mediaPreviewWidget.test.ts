@@ -8,6 +8,7 @@ import { type McpExecutionMode, buildMcpServer } from "./buildServer";
 import { createVideoGenClientFromToken } from "./client";
 import { getHasInlineMediaUrls, jsonResult } from "./result";
 
+
 async function connectClient(executionMode: McpExecutionMode): Promise<Client> {
   const videoGenClient = createVideoGenClientFromToken({
     bearerToken: "test-key",
@@ -24,12 +25,7 @@ async function connectClient(executionMode: McpExecutionMode): Promise<Client> {
   return client;
 }
 
-const mediaPreviewMetaSchema = z.object({
-  ui: z.object({ resourceUri: z.string() }),
-  "openai/outputTemplate": z.string(),
-});
-
-void test("HOSTED server registers media preview resource and generate_image outputTemplate", async () => {
+void test("HOSTED server registers media preview resource without descriptor-level generate widgets", async () => {
   const client = await connectClient("HOSTED");
 
   try {
@@ -37,11 +33,11 @@ void test("HOSTED server registers media preview resource and generate_image out
     const generateImage = tools.find((tool) => tool.name === "generate_image");
 
     assert.ok(generateImage != null, "generate_image should be registered");
-
-    const meta = mediaPreviewMetaSchema.safeParse(generateImage._meta);
-    assert.ok(meta.success, "generate_image _meta should link the media preview widget");
-    assert.equal(meta.data.ui.resourceUri, MEDIA_PREVIEW_WIDGET_URI);
-    assert.equal(meta.data["openai/outputTemplate"], MEDIA_PREVIEW_WIDGET_URI);
+    assert.equal(
+      generateImage._meta?.["openai/outputTemplate"],
+      undefined,
+      "generate_image must not declare openai/outputTemplate (ChatGPT would spawn an empty widget on start)",
+    );
 
     const { resources } = await client.listResources();
     const mediaPreview = resources.find((resource) => resource.uri === MEDIA_PREVIEW_WIDGET_URI);
@@ -113,7 +109,7 @@ void test("LOCAL server does NOT attach media preview meta to generate_image", a
   }
 });
 
-void test("jsonResult tags media payloads with the preview outputTemplate and appMediaUrl", () => {
+void test("jsonResult enriches appMediaUrl without attaching a preview widget by default", () => {
   assert.equal(getHasInlineMediaUrls({ status: "running" }), false);
 
   const withUrl = {
@@ -129,7 +125,7 @@ void test("jsonResult tags media payloads with the preview outputTemplate and ap
   assert.equal(getHasInlineMediaUrls(withUrl), true);
 
   const result = jsonResult(withUrl);
-  assert.equal(result._meta?.["openai/outputTemplate"], MEDIA_PREVIEW_WIDGET_URI);
+  assert.equal(result._meta?.["openai/outputTemplate"], undefined);
   assert.deepEqual(result.structuredContent, {
     status: "succeeded",
     results: [
@@ -142,4 +138,49 @@ void test("jsonResult tags media payloads with the preview outputTemplate and ap
       },
     ],
   });
+});
+
+void test("jsonResult attaches the preview widget only when opted in", () => {
+  const withUrl = {
+    status: "succeeded",
+    results: [
+      {
+        type: "IMAGE",
+        fileId: "vg_file_7XoHR4wyGOlFKNmQeINtl7",
+        downloadUrl: "https://storage.googleapis.com/x",
+      },
+    ],
+  };
+
+  const result = jsonResult(withUrl, { attachMediaPreviewWidget: true });
+  assert.equal(result._meta?.["openai/outputTemplate"], MEDIA_PREVIEW_WIDGET_URI);
+});
+
+void test("HOSTED generate and poll tools do not declare the media preview on the tool descriptor", async () => {
+  const client = await connectClient("HOSTED");
+
+  try {
+    const { tools } = await client.listTools();
+    const noDescriptorWidgetTools = [
+      "generate_image",
+      "generate_motion_graphic",
+      "generate_video_clip",
+      "export_project",
+      "get_tool_execution",
+      "get_file",
+      "get_project_export",
+    ];
+
+    for (const name of noDescriptorWidgetTools) {
+      const tool = tools.find((entry) => entry.name === name);
+      assert.ok(tool != null, `${name} should be registered`);
+      assert.equal(
+        tool._meta?.["openai/outputTemplate"],
+        undefined,
+        `${name} must not declare openai/outputTemplate (each ChatGPT call would spawn a new widget)`,
+      );
+    }
+  } finally {
+    await client.close();
+  }
 });

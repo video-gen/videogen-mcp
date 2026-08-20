@@ -442,6 +442,7 @@ export async function runFullCoverage({
   const ctx: {
     voiceId?: string | undefined;
     imageFileId?: string | undefined;
+    generatedImageFileId?: string | undefined;
     audioFileId?: string | undefined;
     videoFileId?: string | undefined;
     pdfFileId?: string | undefined;
@@ -654,6 +655,7 @@ export async function runFullCoverage({
     assertTerminalSuccess(json, "generate_image");
     ctx.toolExecutionId = findPrefixedId(json, "vg_tool_") ?? ctx.toolExecutionId;
     const outputFileId = findResultFileId(json, "IMAGE");
+    ctx.generatedImageFileId = outputFileId ?? undefined;
     return outputFileId != null ? `outputFileId=${outputFileId}` : "generated";
   });
 
@@ -690,7 +692,7 @@ export async function runFullCoverage({
     async () => {
       const json = await call(
         "generate_music",
-        { prompt: "Upbeat corporate background music, 10 seconds." },
+        { prompt: "Cheerful instrumental acoustic guitar, no vocals." },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "generate_music");
@@ -725,8 +727,23 @@ export async function runFullCoverage({
   await step(
     "generate_avatar",
     async () => {
-      if (ctx.imageFileId == null || ctx.audioFileId == null) {
-        throw new Error("missing image or audio prerequisite for generate_avatar");
+      if (ctx.audioFileId == null) {
+        throw new Error("missing audio prerequisite for generate_avatar");
+      }
+
+      const portrait = await call(
+        "generate_image",
+        {
+          prompt:
+            "Photorealistic head-and-shoulders portrait of an adult looking at the camera, studio lighting, plain background.",
+          quality: "LOW",
+        },
+        { longRunning: true },
+      );
+      assertTerminalSuccess(portrait, "generate_image (avatar portrait)");
+      const portraitFileId = findResultFileId(portrait, "IMAGE");
+      if (portraitFileId == null) {
+        throw new Error("portrait generate_image returned no image file id");
       }
 
       const actor = await call("create_entity", {
@@ -740,7 +757,7 @@ export async function runFullCoverage({
       }
       await call("add_entity_reference", {
         entityId: actorEntityId,
-        fileId: ctx.imageFileId,
+        fileId: portraitFileId,
         isDefault: true,
         description: "Avatar smoke reference",
       });
@@ -759,13 +776,14 @@ export async function runFullCoverage({
   await step(
     "vectorize_image",
     async () => {
-      if (ctx.imageFileId == null) {
+      const imageFileId = ctx.generatedImageFileId ?? ctx.imageFileId;
+      if (imageFileId == null) {
         throw new Error("no source image file id");
       }
 
       const json = await call(
         "vectorize_image",
-        { imageFileId: ctx.imageFileId },
+        { imageFileId },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "vectorize_image");
@@ -810,13 +828,14 @@ export async function runFullCoverage({
   await step(
     "image_3d_effect",
     async () => {
-      if (ctx.imageFileId == null) {
+      const imageFileId = ctx.generatedImageFileId ?? ctx.imageFileId;
+      if (imageFileId == null) {
         throw new Error("no source image file id");
       }
 
       const json = await call(
         "image_3d_effect",
-        { imageFileId: ctx.imageFileId },
+        { imageFileId },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "image_3d_effect");

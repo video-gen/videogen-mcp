@@ -5,7 +5,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { UPLOAD_WIDGET_URI } from "../appWidget";
 import { type McpExecutionMode, buildMcpServer } from "../buildServer";
 import { createVideoGenClientFromToken } from "../client";
-import type { McpHostSurface } from "../hostSurface";
+import {
+  getServerInstructionsForHostSurface,
+  type McpHostSurface,
+} from "../hostSurface";
 import {
   GUIDANCE_DOCUMENTS,
   GUIDANCE_MIME_TYPE,
@@ -112,6 +115,19 @@ void test("HOSTED still lists widget resources alongside guidance", async () => 
   } finally {
     await client.close();
   }
+});
+
+void test("async-tasks guidance and server instructions set honest generation waits", () => {
+  const [asyncTasks] = getGuidanceDocuments({ hostSurface: "STANDARD" }).filter(
+    (doc) => doc.id === "async-tasks",
+  );
+  assert.ok(asyncTasks != null);
+  assert.match(asyncTasks.markdown, /honest time expectation/i);
+  assert.match(asyncTasks.markdown, /2–5 minutes/);
+
+  const instructions = getServerInstructionsForHostSurface({ hostSurface: "CHATGPT_APP" });
+  assert.match(instructions, /2–5 minutes/);
+  assert.match(instructions, /Do not imply a clip will be ready in a few seconds/);
 });
 
 void test("STANDARD getting-started credits guidance walks into upgrade deep links", () => {

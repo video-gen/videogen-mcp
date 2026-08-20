@@ -155,7 +155,9 @@ function MediaPreviewWidget(): ReactElement {
 
   const openUrl = (url: string): void => {
     if (window.openai?.openExternal != null) {
-      window.openai.openExternal({ href: url });
+      // ChatGPT appends `?redirectUrl=...` unless we disable it, which can
+      // replace our `/media?storageFileId=` query.
+      window.openai.openExternal({ href: url, redirectUrl: false });
       return;
     }
 
@@ -203,7 +205,7 @@ function MediaPreviewWidget(): ReactElement {
       >
         {isRehydrating
           ? "Loading media preview…"
-          : "Media will appear here when generation finishes."}
+          : "This can take a few minutes. Media will appear here when generation finishes."}
       </div>
     );
   }
@@ -291,16 +293,26 @@ function MediaPreviewWidget(): ReactElement {
               {item.label ?? item.fileId ?? item.kind}
             </span>
             {item.appMediaUrl != null ? (
-              <button
-                type="button"
-                onClick={() => {
+              <a
+                href={item.appMediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => {
                   const appMediaUrl = item.appMediaUrl;
                   if (appMediaUrl == null) {
                     return;
                   }
 
-                  // Never open signed storage URLs here — ChatGPT appends query
-                  // params and breaks the signature. Open the in-app Media modal.
+                  // Never open signed storage URLs here — ChatGPT appends
+                  // `redirectUrl` by default and that can replace our
+                  // `storageFileId` query. Disable that rewrite.
+                  if (window.openai?.openExternal != null) {
+                    event.preventDefault();
+                    window.openai.openExternal({ href: appMediaUrl, redirectUrl: false });
+                    return;
+                  }
+
+                  event.preventDefault();
                   openUrl(appMediaUrl);
                 }}
                 style={{
@@ -311,10 +323,11 @@ function MediaPreviewWidget(): ReactElement {
                   cursor: "pointer",
                   flexShrink: 0,
                   fontSize: 12,
+                  textDecoration: "none",
                 }}
               >
                 Open in VideoGen
-              </button>
+              </a>
             ) : null}
           </div>
         </div>

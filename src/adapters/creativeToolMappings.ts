@@ -9,5 +9,6 @@ export function styleToVisualStyle({
   return {
     type: "AI_IMAGE",
     aiStyle: style ?? DEFAULT_MCP_AI_STYLE,
+    restyleFeaturedBRollWithAiStyle: true,
   };
 }
