@@ -75,7 +75,7 @@ const BASE_GUIDANCE_DOCUMENTS: readonly Omit<GuidanceDocument, "markdown">[] = [
     toolName: "get_getting_started_guidance",
     title: "Getting started guidance",
     description:
-      "How to authenticate, verify with get_me, choose workflows vs media tools, and follow VideoGen id conventions. Call when connecting, onboarding, or the user asks how to set up the API or MCP.",
+      "How to authenticate, verify with get_me, introduce VideoGen with workflow example prompts, choose workflows vs media tools, and follow VideoGen id conventions. Call when connecting, onboarding, the user asks what VideoGen can do, or how to set up the API or MCP.",
   },
   {
     id: "async-tasks",

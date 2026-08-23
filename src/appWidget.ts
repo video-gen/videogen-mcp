@@ -48,12 +48,18 @@ const MEDIA_RESOURCE_DOMAINS = [
   // Cloudflare Images — inline signed / public delivery
   "https://imagedelivery.net",
   // Cloudflare Images — Content-Disposition download Workers
+  "https://image-download.videogen.io",
   "https://image-download-prod.videogen.io",
   "https://image-download-prerelease.videogen.io",
   "https://image-download-dev.videogen.io",
   "https://image-download-local.videogen.io",
-  // Legacy prod download Worker (retired; keep for already-signed URLs)
-  "https://image-download.videogen.io",
+  // Cloudflare R2 — storage-file download Workers (prod on videogen.io;
+  // local / DEV / PRERELEASE on Sandbox videogen-sandbox.io)
+  "https://storage-download.videogen.io",
+  "https://storage-download-prod.videogen.io",
+  "https://storage-download-prerelease.videogen-sandbox.io",
+  "https://storage-download-dev.videogen-sandbox.io",
+  "https://storage-download-local.videogen-sandbox.io",
   // Cloudflare R2 — pre-signed object URLs
   "https://*.r2.cloudflarestorage.com",
   // Cloudflare R2 — public-preview bucket custom / r2.dev hosts

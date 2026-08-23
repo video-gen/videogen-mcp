@@ -13,8 +13,8 @@ const mirroredToolsSchema = z.looseObject({
       z.looseObject({
         name: z.string(),
         title: z.string().optional(),
-        securitySchemes: z.unknown(),
-        _meta: z.unknown(),
+        securitySchemes: z.unknown().optional(),
+        _meta: z.unknown().optional(),
       }),
     ),
   }),

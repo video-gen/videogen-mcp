@@ -84,6 +84,7 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 
 | User says | Do this |
 | --- | --- |
+| “What can VideoGen do?” | Lead with finished-video workflows and pretty prompts such as “Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover” or “Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end”. Do not open with `generate_motion_graphic` or a countdown. |
 | “Make a 60s explainer from this script” | `script_to_video` → optional remix → `export_project` |
 | “Make a ~1 minute 16:9 video about a product launch” (no workflow named) | Ask script vs storyboard (pros/cons); default recommendation **`script_to_video`** |
 | “Storyboard three hero shots of the bottle” | `storyboard_to_video` with ≤ 3 scenes |

@@ -130,6 +130,28 @@ void test("async-tasks guidance and server instructions set honest generation wa
   assert.match(instructions, /Do not imply a clip will be ready in a few seconds/);
 });
 
+void test("capability answers lead with workflow example prompts, not motion graphics", () => {
+  const instructions = getServerInstructionsForHostSurface({ hostSurface: "CHATGPT_APP" });
+  assert.match(instructions, /compound interest works/);
+  assert.match(instructions, /3-scene vertical UGC ad for my new water bottle/);
+  assert.match(instructions, /Do not use a motion graphic, countdown/);
+
+  const [gettingStarted] = getGuidanceDocuments({ hostSurface: "CHATGPT_APP" }).filter(
+    (doc) => doc.id === "getting-started",
+  );
+  assert.ok(gettingStarted != null);
+  assert.match(gettingStarted.markdown, /compound interest works/);
+  assert.match(gettingStarted.markdown, /3-scene vertical UGC ad for my new water bottle/);
+  assert.match(gettingStarted.markdown, /Do not open with a motion graphic, countdown/);
+  assert.match(gettingStarted.description, /what VideoGen can do/);
+
+  const [toolsVsWorkflows] = getGuidanceDocuments({ hostSurface: "CHATGPT_APP" }).filter(
+    (doc) => doc.id === "tools-vs-workflows",
+  );
+  assert.ok(toolsVsWorkflows != null);
+  assert.match(toolsVsWorkflows.markdown, /Do not open with `generate_motion_graphic`/);
+});
+
 void test("STANDARD getting-started credits guidance walks into upgrade deep links", () => {
   const [gettingStarted] = getGuidanceDocuments({ hostSurface: "STANDARD" }).filter(
     (doc) => doc.id === "getting-started",

@@ -103,11 +103,13 @@ export const getServerInstructionsForHostSurface = ({
 
 Prefer workflows for full narrated multi-scene video; prefer generate_* media tools for a single asset. VideoGen routes generative tools to a suitable model automatically — do not ask the user to pick an upstream model vendor.
 
+When the user asks what VideoGen can do, or you need starter prompts: lead with finished-video workflows, not a catalog of generate_* tools. Give two examples such as "Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover" and "Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end". Do not use a motion graphic, countdown, lower-third, or other single-asset tool as a first example. Mention standalone media tools only if they ask for one image, clip, overlay, or transform.
+
 For ~1 minute+ narrated / informational videos from text, prefer script_to_video. Use storyboard_to_video only for short shot-directed spots, and never more than 3 scenes unless the user explicitly asks for more (storyboard is much more credit-heavy). If the user has not named a workflow, ask with short pros/cons before starting.
 
 For consistent actors/products/styles: upload an image, create_entity, add_entity_reference (isDefault: true), then pass the vg_enti_... id (e.g. actorEntityId). Prefer MCP entity tools over opening the app Entities page unless the user asks for the UI.
 
-Before non-trivial setup, async polling, workflow/remix/export, or tools-vs-workflows decisions, call the matching guidance tool (get_getting_started_guidance, get_async_tasks_guidance, get_workflows_guidance, or get_tools_vs_workflows_guidance). Those tools mirror the guidance:// MCP resources for clients that do not read resources.
+Before non-trivial setup, "what can VideoGen do" answers, async polling, workflow/remix/export, or tools-vs-workflows decisions, call the matching guidance tool (get_getting_started_guidance, get_async_tasks_guidance, get_workflows_guidance, or get_tools_vs_workflows_guidance). Those tools mirror the guidance:// MCP resources for clients that do not read resources.
 
 Generation is not instant. Tell the user a realistic wait before or as you start, then keep polling calmly — a healthy in-progress job is expected, not a stall. Typical wall times: images about 15–60 seconds; video clips about 1–3 minutes (HIGH/MAX can be longer); motion graphics about 2–5 minutes because they write animation code and then render (complex prompts can take longer); avatars and music often a few minutes; full workflows several minutes. Do not imply a clip will be ready in a few seconds.
 
