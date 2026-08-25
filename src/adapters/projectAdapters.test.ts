@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { remixProjectInputSchema } from "./creativeToolContracts";
 import {
   toExportProjectRequest,
   toRemixProjectRequest,
@@ -20,7 +21,7 @@ describe("project MCP adapters", () => {
     assert.deepEqual(
       toRemixProjectRequest({
         projectId: "vg_project_1",
-        edits: ["CAPTIONS", "TRANSITIONS", "ZOOM", "ANIMATE_IMAGES"],
+        edits: ["CAPTIONS", "TRANSITIONS", "ZOOM", "CONVERT_IMAGES_TO_VIDEOS"],
       }),
       {
         remixActions: [
@@ -35,5 +36,17 @@ describe("project MCP adapters", () => {
         ],
       },
     );
+  });
+
+  it("accepts the retired ANIMATE_IMAGES token as convert-images-to-videos", () => {
+    const parsed = remixProjectInputSchema.parse({
+      projectId: "vg_project_1",
+      edits: ["ANIMATE_IMAGES"],
+    });
+
+    assert.deepEqual(parsed.edits, ["CONVERT_IMAGES_TO_VIDEOS"]);
+    assert.deepEqual(toRemixProjectRequest(parsed), {
+      remixActions: [{ type: "CONVERT_IMAGES_TO_VIDEOS" }],
+    });
   });
 });

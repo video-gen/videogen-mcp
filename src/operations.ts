@@ -162,7 +162,9 @@ export type McpOAuthContext = {
 export type McpOperations = {
   respondSdk: (
     call: () => Promise<unknown>,
-    options?: { attachMediaPreviewWidget?: boolean },
+    options?: {
+      attachMediaPreviewWidget?: boolean;
+    },
   ) => Promise<CallToolResult>;
   runComposite: (args: {
     start: () => Promise<unknown>;
@@ -270,7 +272,9 @@ export function createMcpOperations(
 
   const respondSdk = async (
     call: () => Promise<unknown>,
-    options?: { attachMediaPreviewWidget?: boolean },
+    options?: {
+      attachMediaPreviewWidget?: boolean;
+    },
   ): Promise<CallToolResult> => {
     const challenge = missingCredentialsChallenge();
     if (challenge != null) {
@@ -278,7 +282,9 @@ export function createMcpOperations(
     }
 
     try {
-      return jsonResult(await call(), {
+      const result = await call();
+
+      return jsonResult(result, {
         attachMediaPreviewWidget: options?.attachMediaPreviewWidget === true,
       });
     } catch (err: unknown) {

@@ -91,7 +91,8 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 | “Generate a hero image of a blue bottle” | `generate_image` |
 | “Turn this MP3 into a video with b-roll” | upload → `voiceover_to_video` → export |
 | “One 8-second product teaser, just the clip file” | `generate_video_clip` |
-| “Add captions and animate the stills on my project” | `remix_project` with `CAPTIONS` and `ANIMATE_IMAGES` |
+| “Add captions and a Ken Burns zoom on my project” | `remix_project` with `CAPTIONS` and `ZOOM` |
+| “Turn the stills into generated video clips” | `remix_project` with `CONVERT_IMAGES_TO_VIDEOS` (expensive; confirm first) |
 | “Remove the background from this PNG” | upload → `remove_image_background` |
 
 ---

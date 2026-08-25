@@ -27,6 +27,7 @@ import {
   OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH,
   OAUTH_PROTECTED_RESOURCE_MCP_PATH,
   OAUTH_PROTECTED_RESOURCE_PATH,
+  OPENAI_APPS_CHALLENGE_PATH,
   OPENID_CONFIGURATION_PATH,
   type McpAuthChallengeMode,
   buildAuthorizationServerMetadata,
@@ -101,6 +102,11 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(payload);
+}
+
+function writePlainText(res: ServerResponse, status: number, body: string): void {
+  res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
+  res.end(body);
 }
 
 /** Writes a JSON-RPC 2.0 error envelope, which MCP clients understand. */
@@ -506,6 +512,24 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
       chatgptEndpoint: MCP_CHATGPT_PATH,
       docs: "https://docs.videogen.io",
     });
+
+    return;
+  }
+
+  if (pathname === OPENAI_APPS_CHALLENGE_PATH && method === "GET") {
+    const token = config.openaiAppsChallengeToken;
+
+    if (token == null) {
+      writePlainText(res, 404, "");
+
+      return;
+    }
+
+    if (!consumeMetadataRateLimit(req, res)) {
+      return;
+    }
+
+    writePlainText(res, 200, token);
 
     return;
   }

@@ -90,6 +90,7 @@ function buildChildEnv(overrides: Record<string, string>): Record<string, string
   delete env.VIDEOGEN_OAUTH_ISSUER;
   delete env.VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL;
   delete env.VIDEOGEN_MCP_PUBLIC_ORIGIN;
+  delete env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN;
 
   return { ...env, ...overrides };
 }
@@ -457,6 +458,42 @@ void test("/mcp/chatgpt returns a soft tool-result challenge (not HTTP 401) for 
     assert.ok(
       typeof challenges[0] === "string" && challenges[0].includes("resource_metadata="),
     );
+  } finally {
+    stopHttpServer(child);
+  }
+});
+
+void test("GET /.well-known/openai-apps-challenge returns the token as text/plain when set", async () => {
+  const challengeToken = "test-openai-apps-challenge-token";
+  const { child, origin } = await startHttpServer({
+    VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN: challengeToken,
+  });
+
+  try {
+    const response = await fetch(`${origin}/.well-known/openai-apps-challenge`);
+    const body = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+
+    assert.equal(response.status, 200);
+    assert.ok(contentType.startsWith("text/plain"));
+    assert.equal(body, challengeToken);
+    assert.equal(body.includes("jsonrpc"), false);
+  } finally {
+    stopHttpServer(child);
+  }
+});
+
+void test("GET /.well-known/openai-apps-challenge is a non-JSON-RPC 404 when the token is unset", async () => {
+  const { child, origin } = await startHttpServer({});
+
+  try {
+    const response = await fetch(`${origin}/.well-known/openai-apps-challenge`);
+    const body = await response.text();
+    const contentType = response.headers.get("content-type") ?? "";
+
+    assert.equal(response.status, 404);
+    assert.ok(contentType.startsWith("text/plain"));
+    assert.equal(body.includes("jsonrpc"), false);
   } finally {
     stopHttpServer(child);
   }

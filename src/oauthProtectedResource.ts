@@ -38,6 +38,13 @@ export const OAUTH_PROTECTED_RESOURCE_CHATGPT_PATH = `${OAUTH_PROTECTED_RESOURCE
 export const OAUTH_AUTHORIZATION_SERVER_METADATA_PATH =
   "/.well-known/oauth-authorization-server";
 
+/**
+ * OpenAI Plugins / ChatGPT Apps domain-verification challenge (RFC 8615).
+ * OpenAI always GETs this origin-root path; Challenge Base URL path suffixes
+ * are ignored. Body must be the portal token as `text/plain`, nothing else.
+ */
+export const OPENAI_APPS_CHALLENGE_PATH = "/.well-known/openai-apps-challenge";
+
 /** Same document under the OpenID discovery well-known path some hosts try first. */
 export const OPENID_CONFIGURATION_PATH = "/.well-known/openid-configuration";
 

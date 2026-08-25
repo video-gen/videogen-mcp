@@ -289,9 +289,21 @@ export const listRemixActionsOutputSchema = z
  */
 export const workflowRunOutputSchema = z
   .object({
-    workflowRunId: z.string().describe("Workflow run id (vg_work_...)."),
-    projectId: z.string().describe("Project created for this run (vg_proj_...)."),
-    projectUrl: z.string().describe("Deep link to the project in the VideoGen editor."),
+    workflowRunId: z
+      .string()
+      .describe(
+        "Workflow run id (vg_work_...). Keep it paired with this response's projectId and projectUrl; a retry returns a new tuple.",
+      ),
+    projectId: z
+      .string()
+      .describe(
+        "Project created for this exact workflow attempt (vg_proj_...). A retry creates a different project.",
+      ),
+    projectUrl: z
+      .string()
+      .describe(
+        "Deep link to the project created for this exact workflow attempt. Keep it paired with workflowRunId; a retry returns a new URL.",
+      ),
     remixActionIds: z
       .array(z.string())
       .optional()

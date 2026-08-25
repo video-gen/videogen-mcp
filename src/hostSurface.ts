@@ -113,7 +113,9 @@ Before non-trivial setup, "what can VideoGen do" answers, async polling, workflo
 
 Generation is not instant. Tell the user a realistic wait before or as you start, then keep polling calmly — a healthy in-progress job is expected, not a stall. Typical wall times: images about 15–60 seconds; video clips about 1–3 minutes (HIGH/MAX can be longer); motion graphics about 2–5 minutes because they write animation code and then render (complex prompts can take longer); avatars and music often a few minutes; full workflows several minutes. Do not imply a clip will be ready in a few seconds.
 
-On the hosted server, long operations may return a still-running snapshot within about 90 seconds; continue with get_workflow_run, get_tool_execution, or get_project_export.`;
+On the hosted server, long operations may return a still-running snapshot within about 90 seconds; continue with get_workflow_run, get_tool_execution, or get_project_export.
+
+Every workflow start call creates a new project. The MCP returns its matching \`workflowRunId\`, \`projectId\`, and \`projectUrl\` together. Treat those three values as an inseparable tuple. If a workflow fails and you retry it, discard the failed attempt's ids, poll only the new \`workflowRunId\`, and share only the \`projectUrl\` returned for the succeeded retry. Never combine progress from a retry with a project URL from an earlier attempt, and never present a failed attempt's project as the completed result.`;
 
   if (hostSurface === "CHATGPT_APP") {
     return `${shared}

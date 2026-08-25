@@ -115,7 +115,7 @@ export function registerProjectTools(
     {
       title: "Remix project",
       description:
-        "Apply curated edits to an existing project. Poll with list_project_remix_actions for status.",
+        "Apply curated edits to an existing project. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still and is expensive. Use ZOOM for cheap Ken Burns camera motion. Poll with list_project_remix_actions for status.",
       inputSchema: remixProjectInputSchema,
       outputSchema: remixProjectOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,

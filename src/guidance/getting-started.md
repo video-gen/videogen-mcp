@@ -112,7 +112,7 @@ Generation spends team credits. When a tool fails for credits or plan access, be
 ## Canonical product flow (reminder)
 
 1. Run a workflow (creates a project).
-2. Optionally `remix_project` (captions, transitions, animate images).
+2. Optionally `remix_project` (captions, transitions, zoom). Use `CONVERT_IMAGES_TO_VIDEOS` only when the user asked to turn stills into generated video clips.
 3. `export_project` to get an MP4 `downloadUrl`.
 
 Full detail: `get_workflows_guidance`.

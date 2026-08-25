@@ -1,0 +1,4 @@
+$ pnpm build
+$ tsup && tsup --config tsup.widget.config.ts
+[ELIFECYCLE] Command failed.
+[ELIFECYCLE] Command failed with exit code 1.

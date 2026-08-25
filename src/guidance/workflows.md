@@ -50,8 +50,8 @@ Call `remix_project` with `projectId` and ordered `edits`:
 | --- | --- |
 | `CAPTIONS` | Show / enable captions |
 | `TRANSITIONS` | Add section and asset transitions |
-| `ANIMATE_IMAGES` | Convert still images into short video clips |
-| `ZOOM` | Apply a Ken Burns zoom to still images |
+| `CONVERT_IMAGES_TO_VIDEOS` | Generate AI video clips from every still (expensive; same as Add Motion). Not zoom. |
+| `ZOOM` | Cheap Ken Burns zoom on stills. Use this for light motion. |
 
 Pass `saveAsNewProject: true` to edit a copy and leave the original alone.
 
@@ -69,6 +69,9 @@ That is the full intended product loop: **workflow → remix → export**.
 
 - **`projectId`** (`vg_proj_...`): use for every follow-up MCP/API call.
 - **`projectUrl`**: human editor link only. Skip it in automated flows.
+- **Retries create new projects.** Keep each `workflowRunId`, `projectId`, and
+  `projectUrl` together. After a retry, poll the new run, replace the failed
+  attempt's ids, and share only the URL for the succeeded retry.
 
 ---
 
@@ -102,11 +105,11 @@ One short AI clip inside an editable project (duration up to about 30 seconds; c
 
 ## Remix notes
 
-MCP `remix_project` exposes a curated subset of remix actions as `edits`. The full REST API supports more action types (music file, logo file, translate, upscale, and others) via `POST /v1/projects/{projectId}/remix`. If the user needs an edit that is not `CAPTIONS` / `TRANSITIONS` / `ANIMATE_IMAGES` / `ZOOM`, say so and point them at the REST/SDK remix API or the VideoGen editor (`projectUrl` / `get_app_deep_link`).
+MCP `remix_project` exposes a curated subset of remix actions as `edits`. The full REST API supports more action types (music file, logo file, translate, upscale, and others) via `POST /v1/projects/{projectId}/remix`. If the user needs an edit that is not `CAPTIONS` / `TRANSITIONS` / `CONVERT_IMAGES_TO_VIDEOS` / `ZOOM`, say so and point them at the REST/SDK remix API or the VideoGen editor (`projectUrl` / `get_app_deep_link`).
 
 When starting a workflow through the REST SDK, callers often pass `remixActions` in the same request so polish runs after build. MCP workflow tools focus on creation; apply polish with `remix_project` after success unless the specific workflow tool documents inline remix fields.
 
-Recommended polish pairs (when using full REST remix types): captions + animate images for script-led videos; transitions + animate images for slideshows. With MCP edits, prefer at least two of `CAPTIONS`, `TRANSITIONS`, `ANIMATE_IMAGES`, and `ZOOM` when the user wants a finished-looking cut.
+Recommended cheap polish: `CAPTIONS` + `ZOOM` (or `TRANSITIONS` + `ZOOM`). Only add `CONVERT_IMAGES_TO_VIDEOS` when the user explicitly asked to turn stills into generated video clips. Do not treat “animate,” “motion,” or “zoom” as that edit.
 
 ---
 

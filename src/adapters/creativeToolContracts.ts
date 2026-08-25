@@ -286,12 +286,29 @@ export const exportProjectInputSchema = z.object({
     .describe("Export quality. Omit for the default."),
 });
 
+const remixEditSchema = z
+  .enum(["CAPTIONS", "TRANSITIONS", "CONVERT_IMAGES_TO_VIDEOS", "ZOOM"])
+  .describe(
+    "CAPTIONS enables captions. TRANSITIONS adds section and asset transitions. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still (expensive; same as Add Motion). ZOOM is cheap Ken Burns camera motion on stills. Use ZOOM for zoom, pan, or light motion. Never use CONVERT_IMAGES_TO_VIDEOS when the user asked for zoom.",
+  );
+
+/**
+ * Older agents sent ANIMATE_IMAGES for this edit. Keep accepting that token
+ * so existing callers do not break, but do not advertise it (it reads like
+ * cheap motion).
+ */
+const remixEditInputSchema = z.preprocess((value) => {
+  return value === "ANIMATE_IMAGES" ? "CONVERT_IMAGES_TO_VIDEOS" : value;
+}, remixEditSchema);
+
 export const remixProjectInputSchema = z.object({
   projectId: z.string().describe("Project id to edit."),
   edits: z
-    .array(z.enum(["CAPTIONS", "TRANSITIONS", "ANIMATE_IMAGES", "ZOOM"]))
+    .array(remixEditInputSchema)
     .min(1)
-    .describe("Curated edits to apply in order."),
+    .describe(
+      "Curated edits to apply in order. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still and is expensive. Use ZOOM for cheap Ken Burns camera motion.",
+    ),
   saveAsNewProject: z.boolean().optional().describe("Apply edits to a copy of the project."),
 });
 

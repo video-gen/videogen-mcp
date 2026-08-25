@@ -9,16 +9,19 @@ let savedIssuer: string | undefined;
 let savedSupabaseProjectUrl: string | undefined;
 let savedBaseUrl: string | undefined;
 let savedVideogenEnv: string | undefined;
+let savedOpenaiAppsChallengeToken: string | undefined;
 
 beforeEach(() => {
   savedIssuer = process.env.VIDEOGEN_OAUTH_ISSUER;
   savedSupabaseProjectUrl = process.env.VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL;
   savedBaseUrl = process.env.VIDEOGEN_BASE_URL;
   savedVideogenEnv = process.env.VIDEOGEN_ENV;
+  savedOpenaiAppsChallengeToken = process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN;
   delete process.env.VIDEOGEN_OAUTH_ISSUER;
   delete process.env.VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL;
   delete process.env.VIDEOGEN_BASE_URL;
   delete process.env.VIDEOGEN_ENV;
+  delete process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN;
 });
 
 afterEach(() => {
@@ -26,6 +29,7 @@ afterEach(() => {
   restoreEnv("VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL", savedSupabaseProjectUrl);
   restoreEnv("VIDEOGEN_BASE_URL", savedBaseUrl);
   restoreEnv("VIDEOGEN_ENV", savedVideogenEnv);
+  restoreEnv("VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN", savedOpenaiAppsChallengeToken);
 });
 
 function restoreEnv(key: string, value: string | undefined): void {
@@ -107,4 +111,22 @@ void test("getVideogenEnvironmentForBaseUrl keeps custom URLs on the configured 
     }),
     "DEV",
   );
+});
+
+void test("openaiAppsChallengeToken is null when the env var is unset", () => {
+  assert.equal(readHttpServerConfig().openaiAppsChallengeToken, null);
+});
+
+void test("openaiAppsChallengeToken is null when the env var is empty or whitespace", () => {
+  process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN = "";
+  assert.equal(readHttpServerConfig().openaiAppsChallengeToken, null);
+
+  process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN = "   ";
+  assert.equal(readHttpServerConfig().openaiAppsChallengeToken, null);
+});
+
+void test("openaiAppsChallengeToken uses the env var and strips surrounding whitespace", () => {
+  process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN = "  challenge-token-value  ";
+
+  assert.equal(readHttpServerConfig().openaiAppsChallengeToken, "challenge-token-value");
 });

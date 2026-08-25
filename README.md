@@ -73,6 +73,7 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 | `VIDEOGEN_BASE_URL` | no         | `https://api.videogen.io` | Override the upstream API base URL (e.g. for local development). Applies to both transports. When unset, the remote server resolves the upstream API per deployment environment (dev/prerelease/prod); local runs default to the public prod API. |
 | `VIDEOGEN_OAUTH_ISSUER` | no     | —                         | Remote server only. Full OAuth 2.1 issuer URL. When set (or derived from the var below), the server advertises OAuth protected-resource metadata (RFC 9728) and a `resource_metadata` 401 challenge so MCP clients can discover the authorization server and run account linking. Must match the issuer that the upstream API (`VIDEOGEN_BASE_URL`) validates tokens against. |
 | `VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL` | no | —             | Remote server only. Supabase project base URL; the issuer is derived as `${url}/auth/v1`. Ignored when `VIDEOGEN_OAUTH_ISSUER` is set. |
+| `VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN` | no | —            | Remote server only. Public OpenAI Plugins / ChatGPT Apps domain-verification token. When set, `GET /.well-known/openai-apps-challenge` returns that exact value as `text/plain`. When unset, that path is a non-JSON-RPC 404. |
 
 ## Tools
 
@@ -117,7 +118,7 @@ Operational manuals exposed as MCP resources and mirror tools (no API credential
 
 Call the matching `get_*_guidance` tool before non-trivial setup, polling, workflow/remix/export, or tools-vs-workflows decisions. Many hosts never auto-attach resources; the tools are the reliable path. Content is grounded in the public docs at [docs.videogen.io](https://docs.videogen.io) but written for MCP tool usage (including hosted wait caps).
 
-Creative MCP tools expose user intent rather than the lower-level developer API request shape. Use `style` for a plain-language visual style and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }`) for output dimensions. Omitted workflow styles use AI-generated images with a cinematic photo-real look. `remix_project` accepts curated `edits`: `CAPTIONS`, `TRANSITIONS`, `ANIMATE_IMAGES`, and `ZOOM`.
+Creative MCP tools expose user intent rather than the lower-level developer API request shape. Use `style` for a plain-language visual style and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }`) for output dimensions. Omitted workflow styles use AI-generated images with a cinematic photo-real look. `remix_project` accepts curated `edits`: `CAPTIONS`, `TRANSITIONS`, `CONVERT_IMAGES_TO_VIDEOS`, and `ZOOM`. `CONVERT_IMAGES_TO_VIDEOS` generates AI video clips from stills (expensive). `ZOOM` is cheap Ken Burns camera motion.
 
 Workflow, media-generation, and export tools start the operation and poll internally. On the **hosted** (Streamable HTTP) server, the wait window is capped under Cloudflare's proxy timeout, so long generations return a still-running snapshot instead of a 524. Use `get_tool_execution`, `get_workflow_run`, or `get_project_export` to continue polling.
 

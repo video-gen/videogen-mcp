@@ -78,6 +78,14 @@ export type HttpServerConfig = {
    * the server falls back to reconstructing the origin from the request.
    */
   publicOrigin: string | null;
+  /**
+   * Public OpenAI Plugins / ChatGPT Apps domain-verification token. When set,
+   * GET `/.well-known/openai-apps-challenge` returns this exact value as
+   * `text/plain` so the portal can verify `mcp.videogen.io`. This is a public
+   * challenge token, not a credential. Empty or unset → that route 404s with a
+   * non-JSON-RPC body.
+   */
+  openaiAppsChallengeToken: string | null;
 };
 
 /**
@@ -96,6 +104,7 @@ export function readHttpServerConfig(): HttpServerConfig {
     baseUrl: readBaseUrl(),
     oauthIssuer: readOauthIssuer(),
     publicOrigin: readPublicOrigin(),
+    openaiAppsChallengeToken: readOpenaiAppsChallengeToken(),
   };
 }
 
@@ -129,6 +138,16 @@ function readPublicOrigin(): string | null {
     case "LOCAL":
       return null;
   }
+}
+
+function readOpenaiAppsChallengeToken(): string | null {
+  const rawToken = process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN;
+
+  if (rawToken == null || rawToken.trim() === "") {
+    return null;
+  }
+
+  return rawToken.trim();
 }
 
 /**

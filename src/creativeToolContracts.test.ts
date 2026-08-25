@@ -149,6 +149,17 @@ describe("creative tools/list contracts", () => {
         motionGraphicTool?.inputSchema.properties?.subToolModes != null,
         "generate_motion_graphic must advertise subToolModes so ChatGPT stays aligned with the API",
       );
+
+      const remixProjectTool = creativeTools.find((tool) => tool.name === "remix_project");
+      assert.notEqual(remixProjectTool, undefined);
+      const remixSchemaText = JSON.stringify(remixProjectTool?.inputSchema);
+      assert.match(remixSchemaText, /CONVERT_IMAGES_TO_VIDEOS/);
+      assert.equal(
+        remixSchemaText.includes("ANIMATE_IMAGES"),
+        false,
+        "remix_project must not advertise ANIMATE_IMAGES; that name reads like cheap motion",
+      );
+      assert.match(remixSchemaText, /ZOOM/);
     } finally {
       await client.close();
       await server.close();

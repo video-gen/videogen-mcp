@@ -19,7 +19,7 @@ function remixEditToAction(edit: RemixEdit): Schemas["RemixAction"] {
         sectionTransition: "DYNAMIC",
         assetTransition: "DYNAMIC",
       };
-    case "ANIMATE_IMAGES":
+    case "CONVERT_IMAGES_TO_VIDEOS":
       return { type: "CONVERT_IMAGES_TO_VIDEOS" };
     case "ZOOM":
       return { type: "ADD_ZOOM" };

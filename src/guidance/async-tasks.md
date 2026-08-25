@@ -69,7 +69,20 @@ After a workflow start succeeds, store:
 
 - **`workflowRunId`**: poll with `get_workflow_run`.
 - **`projectId`**: required for `remix_project`, `export_project`, and other project tools. Prefer this over `projectUrl` for API/MCP automation.
-- **`projectUrl`**: optional deep link for a human to open the editor. Ignore in fully automated flows.
+- **`projectUrl`**: deep link for a human to open the editor. Safe to share while a run is still processing.
+
+Treat those three values as one run-specific tuple. Every workflow start call
+creates a new project. If a run fails and you retry:
+
+1. Discard the failed run's `workflowRunId`, `projectId`, and `projectUrl` from
+   the active result.
+2. Store the retry's run, project id, and project URL.
+3. Poll only the retry's `workflowRunId`.
+4. Share only the `projectUrl` paired with the run that reaches `succeeded`.
+
+Never combine a retry's status or progress with an earlier attempt's project
+link. A failed attempt may leave an editable but ungenerated project behind;
+do not present that project as the completed result.
 
 List recent runs with `list_workflow_runs` when the user asks what is in flight or recent.
 
@@ -110,4 +123,5 @@ Inside MCP chats, prefer polling with the get_* tools above.
 1. **Treating a hosted mid-run snapshot as failure.** Continue with `get_*`.
 2. **Exporting before the workflow (or remix) is `succeeded`.** Wait for terminal success first.
 3. **Using `projectUrl` instead of `projectId` for follow-up tools.** Always pass `projectId`.
-4. **Starting a second long workflow without checking credit/auth errors** from the first. Surface failures clearly; do not silently retry forever.
+4. **Reusing a failed attempt's project link after retrying.** Every retry creates a new project; replace the entire workflow/project tuple and share only the succeeded attempt's `projectUrl`.
+5. **Starting a second long workflow without checking credit/auth errors** from the first. Surface failures clearly; do not silently retry forever.

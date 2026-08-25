@@ -124,10 +124,14 @@ void test("async-tasks guidance and server instructions set honest generation wa
   assert.ok(asyncTasks != null);
   assert.match(asyncTasks.markdown, /honest time expectation/i);
   assert.match(asyncTasks.markdown, /2–5 minutes/);
+  assert.match(asyncTasks.markdown, /Every workflow start call\s+creates a new project/);
+  assert.match(asyncTasks.markdown, /Share only the `projectUrl` paired with the run/);
 
   const instructions = getServerInstructionsForHostSurface({ hostSurface: "CHATGPT_APP" });
   assert.match(instructions, /2–5 minutes/);
   assert.match(instructions, /Do not imply a clip will be ready in a few seconds/);
+  assert.match(instructions, /Treat those three values as an inseparable tuple/);
+  assert.match(instructions, /share only the `projectUrl` returned for the attempt/);
 });
 
 void test("capability answers lead with workflow example prompts, not motion graphics", () => {
