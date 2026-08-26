@@ -22,6 +22,11 @@ const persistentSingleResult = {
   hideFromUi: false,
 };
 
+const persistentSingleResultWithAutoWatermark = {
+  ...persistentSingleResult,
+  watermarkMode: "AUTO",
+};
+
 describe("media MCP adapters", () => {
   it("maps generative image and video inputs", () => {
     assert.deepEqual(
@@ -34,7 +39,7 @@ describe("media MCP adapters", () => {
         prompt: "A premium product photo.",
         aspectRatio: { width: 9, height: 16 },
         entityIds: ["vg_enti_actor"],
-        ...persistentSingleResult,
+        ...persistentSingleResultWithAutoWatermark,
       },
     );
 
@@ -50,7 +55,7 @@ describe("media MCP adapters", () => {
         generateAudio: true,
         suppressBackgroundMusic: true,
         durationSeconds: 6,
-        ...persistentSingleResult,
+        ...persistentSingleResultWithAutoWatermark,
       },
     );
 
@@ -62,7 +67,7 @@ describe("media MCP adapters", () => {
       {
         imageFileIds: ["vg_file_image"],
         generateAudio: false,
-        ...persistentSingleResult,
+        ...persistentSingleResultWithAutoWatermark,
       },
     );
 
@@ -73,7 +78,7 @@ describe("media MCP adapters", () => {
       {
         startFrameFileId: "vg_file_start",
         generateAudio: false,
-        ...persistentSingleResult,
+        ...persistentSingleResultWithAutoWatermark,
       },
     );
 
@@ -88,7 +93,7 @@ describe("media MCP adapters", () => {
         voiceDescription: "A warm, confident young woman's voice",
         audioFileIds: ["vg_file_audio"],
         generateAudio: false,
-        ...persistentSingleResult,
+        ...persistentSingleResultWithAutoWatermark,
       },
     );
   });
@@ -154,7 +159,7 @@ describe("media MCP adapters", () => {
         actorEntityId: "vg_enti_actor",
         avatarQuality: "LOW",
         audioFileId: "vg_file_audio",
-        ...persistentSingleResult,
+        ...persistentSingleResultWithAutoWatermark,
       },
     );
   });
@@ -162,27 +167,27 @@ describe("media MCP adapters", () => {
   it("maps file transforms without exposing operational fields", () => {
     assert.deepEqual(toVectorizeImageRequest({ imageFileId: "vg_file_image" }), {
       imageFileId: "vg_file_image",
-      ...persistentSingleResult,
+      ...persistentSingleResultWithAutoWatermark,
     });
     assert.deepEqual(toRemoveImageBackgroundRequest({ imageFileId: "vg_file_image" }), {
       imageFileId: "vg_file_image",
-      ...persistentSingleResult,
+      ...persistentSingleResultWithAutoWatermark,
     });
     assert.deepEqual(toRemoveVideoBackgroundRequest({ videoFileId: "vg_file_video" }), {
       videoFileId: "vg_file_video",
-      ...persistentSingleResult,
+      ...persistentSingleResultWithAutoWatermark,
     });
     assert.deepEqual(toUpscaleImageRequest({ imageFileId: "vg_file_image" }), {
       imageFileId: "vg_file_image",
-      ...persistentSingleResult,
+      ...persistentSingleResultWithAutoWatermark,
     });
     assert.deepEqual(toUpscaleVideoRequest({ videoFileId: "vg_file_video" }), {
       videoFileId: "vg_file_video",
-      ...persistentSingleResult,
+      ...persistentSingleResultWithAutoWatermark,
     });
     assert.deepEqual(toImage3dEffectRequest({ imageFileId: "vg_file_image" }), {
       imageFileId: "vg_file_image",
-      ...persistentSingleResult,
+      ...persistentSingleResultWithAutoWatermark,
     });
   });
 });

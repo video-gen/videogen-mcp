@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import { generateMotionGraphicInputSchema, scriptToVideoInputSchema } from "./adapters/creativeToolContracts";
+import { generateImageInputSchema, generateMotionGraphicInputSchema, scriptToVideoInputSchema } from "./adapters/creativeToolContracts";
 import { SERVER_VERSION, buildMcpServer } from "./buildServer";
 import { createVideoGenClientFromToken } from "./client";
 
@@ -33,6 +33,7 @@ const CREATIVE_TOOL_NAMES = new Set([
 const FORBIDDEN_FIELDS = [
   "isOutputTemporary",
   "watermarkMode",
+  "endScreenMode",
   "numResults",
   "hideFromUi",
   "wait",
@@ -64,6 +65,14 @@ describe("creative tools/list contracts", () => {
         transparentBackground: true,
       },
     );
+  });
+
+  it("strips watermarkMode instead of advertising it", () => {
+    const staleInput: Record<string, unknown> = {
+      prompt: "A product photo.",
+      watermarkMode: "NONE",
+    };
+    assert.deepEqual(generateImageInputSchema.parse(staleInput), { prompt: "A product photo." });
   });
 
   it("accepts aspectRatio width/height objects", () => {

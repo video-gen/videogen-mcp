@@ -51,7 +51,7 @@ Workflows go further: they orchestrate script/timing, visuals, narration, captio
 
 ### Generate
 
-- `generate_image` — still images from text (and related image flows per tool schema)
+- `generate_image` — still images from text (and related image flows per tool schema). Results may include a VideoGen watermark depending on the account. Do not pass `watermarkMode`.
 - `generate_video_clip` — short standalone video clip (up to about 30 seconds)
 - `text_to_speech` — voiceover audio from text
 - `generate_sound_effect` — SFX from a text description

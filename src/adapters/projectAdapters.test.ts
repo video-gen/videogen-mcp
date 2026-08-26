@@ -7,13 +7,13 @@ import {
 } from "./projectAdapters";
 
 describe("project MCP adapters", () => {
-  it("maps export quality without API operational options", () => {
+  it("maps export quality and always sends AUTO branding", () => {
     assert.deepEqual(
       toExportProjectRequest({
         projectId: "vg_project_1",
         quality: "FULL_HIGH",
       }),
-      { quality: "FULL_HIGH" },
+      { quality: "FULL_HIGH", watermarkMode: "AUTO", endScreenMode: "AUTO" },
     );
   });
 

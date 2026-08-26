@@ -46,10 +46,19 @@ const mcpMediaDefaults = {
   hideFromUi: false as const,
 };
 
+// MCP does not expose watermarkMode. Send AUTO explicitly so branding cannot
+// depend on omit/default at a later adapter, and so a hallucinated NONE cannot
+// ride through if a caller starts spreading extra fields. The API already
+// defaults omitted watermarkMode to AUTO (`watermarkMode ?? "AUTO"`).
+const mcpAutoWatermark = {
+  watermarkMode: "AUTO" as const,
+};
+
 export function toGenerateImageRequest(input: GenerateImageInput): GenerateImageRequest {
   return {
     prompt: input.prompt,
     ...mcpMediaDefaults,
+    ...mcpAutoWatermark,
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
     ...(input.entityIds != null && { entityIds: input.entityIds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
@@ -62,6 +71,7 @@ export function toGenerateVideoClipRequest(
 ): GenerateVideoClipRequest {
   return {
     ...mcpMediaDefaults,
+    ...mcpAutoWatermark,
     generateAudio: input.generateAudio ?? false,
     ...(input.suppressBackgroundMusic != null && {
       suppressBackgroundMusic: input.suppressBackgroundMusic,
@@ -141,34 +151,35 @@ export function toGenerateAvatarRequest(input: GenerateAvatarInput): GenerateAva
     actorEntityId: input.actorEntityId,
     audioFileId: input.audioFileId,
     ...mcpMediaDefaults,
+    ...mcpAutoWatermark,
     ...(input.avatarQuality != null && { avatarQuality: input.avatarQuality }),
   };
 }
 
 export function toVectorizeImageRequest(input: VectorizeImageInput): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
 }
 
 export function toRemoveImageBackgroundRequest(
   input: RemoveImageBackgroundInput,
 ): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
 }
 
 export function toRemoveVideoBackgroundRequest(
   input: RemoveVideoBackgroundInput,
 ): VideoAssetRequest {
-  return { videoFileId: input.videoFileId, ...mcpMediaDefaults };
+  return { videoFileId: input.videoFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
 }
 
 export function toUpscaleImageRequest(input: UpscaleImageInput): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
 }
 
 export function toUpscaleVideoRequest(input: UpscaleVideoInput): VideoAssetRequest {
-  return { videoFileId: input.videoFileId, ...mcpMediaDefaults };
+  return { videoFileId: input.videoFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
 }
 
 export function toImage3dEffectRequest(input: Image3dEffectInput): ImageAssetRequest {
-  return { imageFileId: input.imageFileId, ...mcpMediaDefaults };
+  return { imageFileId: input.imageFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
 }

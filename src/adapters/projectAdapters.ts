@@ -28,6 +28,11 @@ function remixEditToAction(edit: RemixEdit): Schemas["RemixAction"] {
 
 export function toExportProjectRequest(input: ExportProjectInput): ExportProjectRequest {
   return {
+    // MCP does not expose watermarkMode / endScreenMode. Send AUTO explicitly
+    // so branding cannot depend on omit/default at a later adapter. The API
+    // already defaults omitted values to AUTO.
+    watermarkMode: "AUTO",
+    endScreenMode: "AUTO",
     ...(input.quality != null && { quality: input.quality }),
   };
 }

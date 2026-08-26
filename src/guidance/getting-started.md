@@ -104,7 +104,9 @@ Also: `list_entities`, `get_entity`, `update_entity`, `remove_entity_reference`,
 <!-- mcp-host-credits-guidance -->
 ## Credits and product UI
 
-Generation spends team credits. When a tool fails for credits or plan access, be direct: call `get_app_deep_link` with `OPEN_UPGRADE`, `OPEN_PURCHASE_CREDITS`, or `OPEN_ENABLE_TOP_UPS` as appropriate, return that URL, and walk the user into completing the flow in the VideoGen app. Do not claim MCP can change billing inline.
+Generation spends team credits. When a tool fails for credits or plan access, be direct: call `get_app_deep_link` with `OPEN_UPGRADE`, `OPEN_PURCHASE_CREDITS`, or `OPEN_ENABLE_TOP_UPS` as appropriate, return that URL, and walk the user into the flow in the VideoGen app. Do not claim MCP can change billing inline.
+
+MCP never exposes `watermarkMode` or `endScreenMode`. Every generation and export uses `AUTO`: Free-plan results include the VideoGen watermark (and a short "Made with VideoGen" end screen on project exports). Removing that branding requires VideoGen Pro. If the user wants watermark-free output, call `get_app_deep_link` with `OPEN_UPGRADE` and walk them into Pro. After they upgrade, keep using MCP as-is; `AUTO` then omits branding. Do not invent those parameters or tell the user to change a workspace watermark setting.
 <!-- /mcp-host-credits-guidance -->
 
 ---

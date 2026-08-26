@@ -59,7 +59,7 @@ Poll `list_project_remix_actions` until remix actions succeed before exporting i
 
 ### Step 3 — Export
 
-Call `export_project` with `projectId`. When status is `succeeded`, give the user `downloadUrl` (or keep polling with `get_project_export` on hosted).
+Call `export_project` with `projectId`. When status is `succeeded`, give the user `downloadUrl` (or keep polling with `get_project_export` on hosted). MCP always exports with `AUTO` branding (a VideoGen watermark and short end screen may appear depending on the account). Do not pass `watermarkMode` or `endScreenMode`.
 
 That is the full intended product loop: **workflow → remix → export**.
 

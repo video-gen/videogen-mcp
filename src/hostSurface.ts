@@ -86,13 +86,17 @@ export const rewriteMcpErrorMessageForHostSurface = ({
 
 export const STANDARD_MCP_CREDITS_GUIDANCE = `## Credits and product UI
 
-Generation spends team credits. When a tool fails for credits or plan access, be direct: call \`get_app_deep_link\` with \`OPEN_UPGRADE\`, \`OPEN_PURCHASE_CREDITS\`, or \`OPEN_ENABLE_TOP_UPS\` as appropriate, return that URL, and walk the user into completing the flow in the VideoGen app. Do not claim MCP can change billing inline.`;
+Generation spends team credits. When a tool fails for credits or plan access, be direct: call \`get_app_deep_link\` with \`OPEN_UPGRADE\`, \`OPEN_PURCHASE_CREDITS\`, or \`OPEN_ENABLE_TOP_UPS\` as appropriate, return that URL, and walk the user into the flow in the VideoGen app. Do not claim MCP can change billing inline.
+
+MCP never exposes \`watermarkMode\` or \`endScreenMode\`. Every generation and export uses \`AUTO\`: Free-plan results include the VideoGen watermark (and a short "Made with VideoGen" end screen on project exports). Removing that branding requires VideoGen Pro. If the user wants watermark-free output, call \`get_app_deep_link\` with \`OPEN_UPGRADE\` and walk them into Pro. After they upgrade, keep using MCP as-is; \`AUTO\` then omits branding. Do not invent those parameters or tell the user to change a workspace watermark setting.`;
 
 export const CHATGPT_APP_CREDITS_GUIDANCE = `## Credits and account access
 
 Generation spends team credits. If a tool fails because the user is out of credits or a feature isn't available on their account, say clearly that they need to open https://app.videogen.io and manage their VideoGen account to enable it, then retry.
 
-Do not name pricing, plan changes, or credit refill flows. Do not call \`get_app_deep_link\` for billing actions (those actions are not available on this ChatGPT host).`;
+Do not name pricing, plan changes, or credit refill flows. Do not call \`get_app_deep_link\` for billing actions (those actions are not available on this ChatGPT host).
+
+MCP never exposes watermark or end-screen settings. Generated images, clips, and exported videos may include VideoGen branding depending on the account. If the user wants that branding removed, tell them to open https://app.videogen.io and manage their VideoGen account, then retry. Do not invent watermark parameters.`;
 
 export const getServerInstructionsForHostSurface = ({
   hostSurface,
@@ -120,10 +124,14 @@ Every workflow start call creates a new project. The MCP returns its matching \`
   if (hostSurface === "CHATGPT_APP") {
     return `${shared}
 
-Credits / plan gates: tell the user to open https://app.videogen.io and manage their VideoGen account. Never name pricing or plan-change flows, and never open billing deep links.`;
+Credits / plan gates: tell the user to open https://app.videogen.io and manage their VideoGen account. Never name pricing or plan-change flows, and never open billing deep links.
+
+Watermarks: MCP always uses account-default branding (AUTO). Generated images, clips, and exported videos may include VideoGen branding. If the user wants branding removed, tell them to open https://app.videogen.io and manage their VideoGen account. Do not pass watermarkMode or endScreenMode.`;
   }
 
   return `${shared}
 
-Credits / plan gates: use get_app_deep_link (OPEN_UPGRADE, OPEN_PURCHASE_CREDITS, OPEN_ENABLE_TOP_UPS) and walk the user into that VideoGen app flow.`;
+Credits / plan gates: use get_app_deep_link (OPEN_UPGRADE, OPEN_PURCHASE_CREDITS, OPEN_ENABLE_TOP_UPS) and walk the user into that VideoGen app flow.
+
+Watermarks: MCP always uses AUTO branding and does not expose watermarkMode or endScreenMode. Free-plan output includes the VideoGen watermark (and a short end screen on export). Removing watermarks requires VideoGen Pro; use get_app_deep_link OPEN_UPGRADE. After they upgrade, keep using MCP as-is.`;
 };

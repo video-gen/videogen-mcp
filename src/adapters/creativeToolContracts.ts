@@ -48,7 +48,10 @@ const languageSchema = z
   .optional()
   .describe("Output language as a BCP-47 code, such as en, es, or fr.");
 
-const voiceIdSchema = z.string().optional().describe("Voice id from list_tts_voices.");
+const voiceIdSchema = z
+  .string()
+  .optional()
+  .describe("Catalog display name (e.g. Matilda) or voice id from list_tts_voices.");
 
 const avatarQualitySchema = imageQualitySchema.describe(
   "Avatar generation quality tier. Applies when actorEntityId is provided. Omit to use workspace settings.",
@@ -206,7 +209,9 @@ export const generateVideoClipInputSchema = z
 
 export const textToSpeechInputSchema = z.object({
   text: z.string().min(1).describe("Text to speak."),
-  voiceId: z.string().describe("Voice id from list_tts_voices."),
+  voiceId: z
+    .string()
+    .describe("Catalog display name (e.g. Matilda) or voice id from list_tts_voices."),
   language: z.string().nullable().optional().describe("ISO-639-1 pronunciation language hint."),
   speed: z.number().min(0.5).max(2).optional().describe("Speech-rate multiplier."),
 });

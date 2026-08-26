@@ -131,7 +131,14 @@ void test("async-tasks guidance and server instructions set honest generation wa
   assert.match(instructions, /2–5 minutes/);
   assert.match(instructions, /Do not imply a clip will be ready in a few seconds/);
   assert.match(instructions, /Treat those three values as an inseparable tuple/);
-  assert.match(instructions, /share only the `projectUrl` returned for the attempt/);
+  assert.match(instructions, /share only the `projectUrl` returned for the succeeded retry/);
+  assert.match(instructions, /account-default branding/);
+  assert.equal(/VideoGen Pro|OPEN_UPGRADE/i.test(instructions), false);
+
+  const standardInstructions = getServerInstructionsForHostSurface({ hostSurface: "STANDARD" });
+  assert.match(standardInstructions, /VideoGen Pro/);
+  assert.match(standardInstructions, /OPEN_UPGRADE/);
+  assert.match(standardInstructions, /AUTO branding/);
 });
 
 void test("capability answers lead with workflow example prompts, not motion graphics", () => {
@@ -164,6 +171,9 @@ void test("STANDARD getting-started credits guidance walks into upgrade deep lin
   assert.match(gettingStarted.markdown, /OPEN_UPGRADE/);
   assert.match(gettingStarted.markdown, /OPEN_PURCHASE_CREDITS/);
   assert.match(gettingStarted.markdown, /OPEN_ENABLE_TOP_UPS/);
+  assert.match(gettingStarted.markdown, /watermarkMode/);
+  assert.match(gettingStarted.markdown, /VideoGen Pro/);
+  assert.match(gettingStarted.markdown, /AUTO/);
 });
 
 void test("ChatGPT getting-started credits guidance never mentions purchase verbs", async () => {
@@ -172,6 +182,7 @@ void test("ChatGPT getting-started credits guidance never mentions purchase verb
   );
   assert.ok(gettingStarted != null);
   assert.match(gettingStarted.markdown, /manage their VideoGen account/);
+  assert.match(gettingStarted.markdown, /branding/);
   assert.equal(/buy|purchase|upgrade|top-?ups?/i.test(gettingStarted.markdown), false);
 
   const client = await connectClient("HOSTED", "CHATGPT_APP");
