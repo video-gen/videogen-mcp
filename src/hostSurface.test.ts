@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   CHATGPT_APP_ACCOUNT_GATE_MESSAGE,
   CHATGPT_APP_COMMERCE_DEEP_LINK_REJECTED_MESSAGE,
+  getIsChatGptForbiddenNavigateDestination,
   getIsMcpCommerceDeepLinkAction,
   getLooksLikeMcpBillingGateMessage,
   rewriteMcpErrorMessageForHostSurface,
@@ -15,6 +16,13 @@ void test("commerce deep-link actions are detected", () => {
   assert.equal(getIsMcpCommerceDeepLinkAction({ action: "OPEN_RATE_CARD" }), true);
   assert.equal(getIsMcpCommerceDeepLinkAction({ action: "NAVIGATE" }), false);
   assert.equal(getIsMcpCommerceDeepLinkAction({ action: "OPEN_INVITE_TEAMMATES" }), false);
+});
+
+void test("ChatGPT forbids NAVIGATE to billing settings", () => {
+  assert.equal(getIsChatGptForbiddenNavigateDestination({ destination: "BILLING_SETTINGS" }), true);
+  assert.equal(getIsChatGptForbiddenNavigateDestination({ destination: "PROJECTS" }), false);
+  assert.equal(getIsChatGptForbiddenNavigateDestination({ destination: "ACCOUNT_SETTINGS" }), false);
+  assert.equal(getIsChatGptForbiddenNavigateDestination({ destination: "USAGE" }), false);
 });
 
 void test("ChatGPT Apps rewrites billing-gate API messages without purchase verbs", () => {

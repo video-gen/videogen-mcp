@@ -5,6 +5,7 @@ import {
   CHATGPT_APP_DEEP_LINK_ACTIONS,
   STANDARD_APP_DEEP_LINK_ACTIONS,
   generateVideoClipInputSchema,
+  getChatGptAppDeepLinkInputSchema,
   storyboardToVideoInputSchema,
 } from "./inputSchemas";
 
@@ -151,6 +152,17 @@ describe("app deep-link action surfaces", () => {
     for (const action of CHATGPT_APP_DEEP_LINK_ACTIONS) {
       assert.equal(commerceActions.has(action), false);
     }
+  });
+
+  it("does not advertise BILLING_SETTINGS on the ChatGPT destination field", () => {
+    const destination = getChatGptAppDeepLinkInputSchema.destination;
+    const description =
+      destination != null && "description" in destination && typeof destination.description === "string"
+        ? destination.description
+        : "";
+    assert.ok(description.length > 0);
+    assert.equal(/BILLING_SETTINGS/i.test(description), false);
+    assert.match(description, /app\.videogen\.io/);
   });
 
   it("keeps every commerce action available on the STANDARD surface", () => {

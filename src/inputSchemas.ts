@@ -91,22 +91,25 @@ export const CHATGPT_APP_DEEP_LINK_ACTIONS = [
   "NAVIGATE",
 ] as const;
 
+const STANDARD_DEEP_LINK_DESTINATION_DESCRIBE =
+  "Required for NAVIGATE. In-app keys like PROJECTS, BILLING_SETTINGS, SUPPORT; or HELP_CENTER / API_DOCS.";
+
+const CHATGPT_APP_DEEP_LINK_DESTINATION_DESCRIBE =
+  "Required for NAVIGATE. In-app keys like PROJECTS, TEAM, SUPPORT; or HELP_CENTER / API_DOCS. Do not use billing destinations. For credits or account access, tell the user to open https://app.videogen.io and manage their VideoGen account.";
+
 const buildAppDeepLinkInputSchema = ({
   actions,
+  destinationDescribe,
 }: {
   actions: readonly [string, ...string[]];
+  destinationDescribe: string;
 }) => ({
   action: z
     .enum(actions)
     .describe(
       "Assistant COMMON action to deep-link into the VideoGen app (opens a modal or navigates after sign-in).",
     ),
-  destination: z
-    .string()
-    .optional()
-    .describe(
-      "Required for NAVIGATE. In-app keys like PROJECTS, BILLING_SETTINGS, SUPPORT; or HELP_CENTER / API_DOCS.",
-    ),
+  destination: z.string().optional().describe(destinationDescribe),
   articleSlug: z
     .string()
     .optional()
@@ -141,10 +144,12 @@ const buildAppDeepLinkInputSchema = ({
 
 export const getAppDeepLinkInputSchema = buildAppDeepLinkInputSchema({
   actions: STANDARD_APP_DEEP_LINK_ACTIONS,
+  destinationDescribe: STANDARD_DEEP_LINK_DESTINATION_DESCRIBE,
 });
 
 export const getChatGptAppDeepLinkInputSchema = buildAppDeepLinkInputSchema({
   actions: CHATGPT_APP_DEEP_LINK_ACTIONS,
+  destinationDescribe: CHATGPT_APP_DEEP_LINK_DESTINATION_DESCRIBE,
 });
 
 export const listProjectsInputSchema = {

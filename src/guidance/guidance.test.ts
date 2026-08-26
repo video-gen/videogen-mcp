@@ -236,6 +236,29 @@ void test("ChatGPT get_app_deep_link omits and rejects commerce actions", async 
     const rejectedText = getTextContent(rejected.content);
     assert.equal(/vg_action=OPEN_UPGRADE/i.test(rejectedText), false);
     assert.equal(/buy credits|purchase credits/i.test(rejectedText), false);
+
+    const destinationProperty =
+      "properties" in actionSchema &&
+      actionSchema.properties != null &&
+      typeof actionSchema.properties === "object" &&
+      "destination" in actionSchema.properties
+        ? actionSchema.properties.destination
+        : null;
+    assert.ok(destinationProperty != null && typeof destinationProperty === "object");
+    const destinationDescription =
+      "description" in destinationProperty && typeof destinationProperty.description === "string"
+        ? destinationProperty.description
+        : "";
+    assert.equal(/BILLING_SETTINGS/i.test(destinationDescription), false);
+
+    const billingNavigate = await client.callTool({
+      name: "get_app_deep_link",
+      arguments: { action: "NAVIGATE", destination: "BILLING_SETTINGS" },
+    });
+    assert.equal(billingNavigate.isError, true);
+    const billingText = getTextContent(billingNavigate.content);
+    assert.equal(/settings\/billing/i.test(billingText), false);
+    assert.equal(/buy|purchase|upgrade|top-?ups?/i.test(billingText), false);
   } finally {
     await client.close();
   }

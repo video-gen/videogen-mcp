@@ -5,9 +5,9 @@
  *   and direct upgrade / buy-credits / enable-top-ups guidance are allowed.
  * - `CHATGPT_APP`: `/mcp/chatgpt` only. OpenAI's Plugins directory forbids
  *   directing users to purchase digital goods (subscriptions, credits, IAPs).
- *   Commerce deep-link actions are omitted from tools/list, rejected if called,
- *   and billing failures are rewritten to "manage your VideoGen account" copy
- *   that never says purchase / buy / upgrade / top-ups.
+ *   Commerce deep-link actions and NAVIGATE → BILLING_SETTINGS are omitted /
+ *   rejected, and billing failures are rewritten to "manage your VideoGen
+ *   account" copy that never says purchase / buy / upgrade / top-ups.
  *
  * See `.cursor/rules/chatgpt-mcp-no-commerce.mdc`.
  */
@@ -30,6 +30,22 @@ export const getIsMcpCommerceDeepLinkAction = ({
 }: {
   action: string;
 }): boolean => COMMERCE_DEEP_LINK_ACTION_SET.has(action);
+
+/**
+ * `NAVIGATE` destinations that open billing / purchase UI. Forbidden on ChatGPT
+ * even though `NAVIGATE` itself stays available for non-billing pages.
+ */
+export const MCP_CHATGPT_FORBIDDEN_NAVIGATE_DESTINATIONS = ["BILLING_SETTINGS"] as const;
+
+const CHATGPT_FORBIDDEN_NAVIGATE_DESTINATION_SET: ReadonlySet<string> = new Set(
+  MCP_CHATGPT_FORBIDDEN_NAVIGATE_DESTINATIONS,
+);
+
+export const getIsChatGptForbiddenNavigateDestination = ({
+  destination,
+}: {
+  destination: string;
+}): boolean => CHATGPT_FORBIDDEN_NAVIGATE_DESTINATION_SET.has(destination);
 
 /**
  * ChatGPT Apps / Plugins: never name purchase flows. Point the user at the app

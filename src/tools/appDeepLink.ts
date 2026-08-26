@@ -6,6 +6,7 @@ import {
 import {
   CHATGPT_APP_COMMERCE_DEEP_LINK_REJECTED_MESSAGE,
   type McpHostSurface,
+  getIsChatGptForbiddenNavigateDestination,
   getIsMcpCommerceDeepLinkAction,
 } from "../hostSurface";
 import {
@@ -28,9 +29,10 @@ const CHATGPT_APP_DEEP_LINK_DESCRIPTION =
  * `vg_action=…` query params after sign-in.
  *
  * On `CHATGPT_APP` (`/mcp/chatgpt`), commerce actions (upgrade / purchase
- * credits / enable top-ups / rate card) are omitted from the input schema and
- * rejected if called — OpenAI Plugins policy forbids directing users to buy
- * digital goods. See `.cursor/rules/chatgpt-mcp-no-commerce.mdc`.
+ * credits / enable top-ups / rate card) and `NAVIGATE` → `BILLING_SETTINGS` are
+ * omitted from the advertised schema and rejected if called — OpenAI Plugins
+ * policy forbids directing users to buy digital goods. See
+ * `.cursor/rules/chatgpt-mcp-no-commerce.mdc`.
  *
  * No VideoGen API call — advertised `noauth` so ChatGPT can surface the link
  * before OAuth linking.
@@ -59,6 +61,15 @@ export function registerAppDeepLinkTool(
       // Defense in depth: even if a host invents a commerce action string, never
       // mint a purchase URL from the ChatGPT Apps endpoint.
       if (isChatGptApp && getIsMcpCommerceDeepLinkAction({ action: args.action })) {
+        return errorResult(CHATGPT_APP_COMMERCE_DEEP_LINK_REJECTED_MESSAGE);
+      }
+
+      if (
+        isChatGptApp &&
+        args.action === "NAVIGATE" &&
+        args.destination != null &&
+        getIsChatGptForbiddenNavigateDestination({ destination: args.destination })
+      ) {
         return errorResult(CHATGPT_APP_COMMERCE_DEEP_LINK_REJECTED_MESSAGE);
       }
 

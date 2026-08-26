@@ -1,2 +1,2 @@
 
-[2m$ tsc --noEmit && tsc -p web/tsconfig.json --noEmit[22m
+$ tsc --noEmit && tsc -p web/tsconfig.json --noEmit
