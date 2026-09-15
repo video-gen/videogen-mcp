@@ -99,7 +99,6 @@ const MEDIA_PREVIEW_REDIRECT_DOMAINS = [
   "https://app.videogen.io",
   "https://prerelease.app.videogen.io",
   "https://dev.app.videogen.io",
-  "https://staging.app.videogen.io",
   "http://localhost:3000",
 ] as const;
 

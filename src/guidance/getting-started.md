@@ -36,11 +36,11 @@ If this fails with 401, stop and fix auth before starting workflows or tools (th
 
 | Goal | What to use |
 | --- | --- |
-| Full narrated multi-scene video (editable project, then export) | A workflow tool: prefer `script_to_video` for ~1 minute+ / informational text; use `storyboard_to_video` only for short shot lists (≤ 3 scenes unless the user asks for more); also `voiceover_to_video`, `slideshow_to_video`, `prompt_to_video_clip` |
+| Full narrated multi-scene video (editable project plus MP4) | A workflow tool: prefer `script_to_video` for ~1 minute+ / informational text; use `storyboard_to_video` only for short shot lists (≤ 3 scenes unless the user asks for more); also `voiceover_to_video`, `slideshow_to_video`, `prompt_to_video_clip`. Wait for `downloadUrl`. |
 | One image, clip, voiceover, music, avatar, or transform | A media tool: `generate_image`, `generate_video_clip`, `text_to_speech`, etc. |
 | Reusable actor / product / visual style | `create_entity` + `add_entity_reference` (upload the image first), then pass `vg_enti_...` into workflows / `generate_avatar` |
 | Polish an existing project | `remix_project` with curated `edits` |
-| Download an MP4 | `export_project`, then poll with `get_project_export` if needed |
+| Download an MP4 from a workflow | Use `downloadUrl` on the succeeded workflow run (auto-export is on by default). Call `export_project` only if you set `autoExport: false`. |
 
 When unsure between workflow vs tool, call `get_tools_vs_workflows_guidance`. When unsure **which** workflow (especially script vs storyboard), call `get_workflows_guidance` and **ask the user** with short pros/cons before spending credits.
 
@@ -113,8 +113,8 @@ MCP never exposes `watermarkMode` or `endScreenMode`. Every generation and expor
 
 ## Canonical product flow (reminder)
 
-1. Run a workflow (creates a project).
-2. Optionally `remix_project` (captions, transitions, zoom). Use `CONVERT_IMAGES_TO_VIDEOS` only when the user asked to turn stills into generated video clips.
-3. `export_project` to get an MP4 `downloadUrl`.
+1. Run a workflow (creates a project). Default `autoExport` waits for an MP4.
+2. Give the user `downloadUrl` when status is `succeeded`.
+3. Optionally set `autoExport: false`, then `remix_project`, then `export_project`, if polish must appear in the MP4.
 
 Full detail: `get_workflows_guidance`.

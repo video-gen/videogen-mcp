@@ -16,7 +16,7 @@ Ask what “done” looks like for the user.
 - They need an **editable project** they can remix and export to MP4
 - Input is a **script**, **voiceover file**, **slideshow**, **storyboard**, or **short prompt-as-project clip**
 
-Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`). Then remix and export. Details: `get_workflows_guidance`.
+Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`). Wait until `succeeded` and give the user `downloadUrl` (auto-export is on by default). Details: `get_workflows_guidance`.
 
 **Which workflow?** For ~1 minute+ narrated / informational / news-style videos from text, prefer **`script_to_video`**. Use **`storyboard_to_video`** only for short, shot-directed spots, and **never more than 3 scenes** unless the user explicitly asks for more (storyboard is much more credit-heavy per scene). If the user has not named a workflow, **ask** with a short pros/cons (script vs storyboard) before starting.
 
@@ -76,7 +76,7 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 
 - `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`
 - `list_workflow_runs`, `get_workflow_run`, `cancel_workflow_run`
-- Then `remix_project` / `export_project` on the resulting `projectId`
+- Then wait for `succeeded` and use `downloadUrl` (default auto-export). Set `autoExport: false` only if you need `remix_project` before `export_project`.
 
 ---
 
@@ -85,11 +85,11 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 | User says | Do this |
 | --- | --- |
 | “What can VideoGen do?” | Lead with finished-video workflows and pretty prompts such as “Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover” or “Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end”. Do not open with `generate_motion_graphic` or a countdown. |
-| “Make a 60s explainer from this script” | `script_to_video` → optional remix → `export_project` |
+| “Make a 60s explainer from this script” | `script_to_video` (default auto-export) → give the user `downloadUrl` |
 | “Make a ~1 minute 16:9 video about a product launch” (no workflow named) | Ask script vs storyboard (pros/cons); default recommendation **`script_to_video`** |
 | “Storyboard three hero shots of the bottle” | `storyboard_to_video` with ≤ 3 scenes |
 | “Generate a hero image of a blue bottle” | `generate_image` |
-| “Turn this MP3 into a video with b-roll” | upload → `voiceover_to_video` → export |
+| “Turn this MP3 into a video with b-roll” | upload → `voiceover_to_video` → `downloadUrl` |
 | “One 8-second product teaser, just the clip file” | `generate_video_clip` |
 | “Add captions and a Ken Burns zoom on my project” | `remix_project` with `CAPTIONS` and `ZOOM` |
 | “Turn the stills into generated video clips” | `remix_project` with `CONVERT_IMAGES_TO_VIDEOS` (expensive; confirm first) |
@@ -102,5 +102,5 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 1. **Chaining five media tools** to fake a full video when `script_to_video` exists.
 2. **Starting `script_to_video`** when the user only asked for a stock-style still or one SFX.
 3. **Naming internal AI vendors** to the user. Stay on VideoGen concepts: tools, workflows, quality, style.
-4. **Forgetting that workflow output is a project**, not the final MP4, until `export_project` succeeds.
+4. **Forgetting `downloadUrl`.** With default auto-export, a succeeded workflow includes the MP4 URL. Only use `export_project` when you set `autoExport: false` (for remix-first).
 5. **Running a long `storyboard_to_video`** (many scenes) for an informational / ~1 minute brief. Prefer `script_to_video`, or ask first; cap storyboard at 3 scenes unless the user insists.

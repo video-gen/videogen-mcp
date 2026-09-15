@@ -6,7 +6,9 @@ Workflows create an editable **project** and run the full generation pipeline. T
 
 ---
 
-## Fast Path: run → remix → export
+## Fast Path: run (auto-export) → MP4
+
+Workflow tools default to `autoExport: true`. Wait until status is **`succeeded`**, then give the user **`downloadUrl`**. Do not treat `workflowRunId` as the finished video.
 
 ### Step 1 — Choose and start a workflow
 
@@ -36,13 +38,15 @@ Hard rules for `storyboard_to_video`:
 3. For “about one minute,” “explainer,” “informational,” “news,” or similar without a shot list → prefer **`script_to_video`**, or ask script vs storyboard with the table above.
 4. Do not use storyboard as a fallback when another workflow’s optional fields fail validation. Fix the payload or switch intentionally after asking.
 
-Creative MCP fields use plain-language `style` (visual look) and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }` for 16:9). Omit `style` for a cinematic photo-real AI look.
+Creative MCP fields use `style` (visual look) and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }` for 16:9). Write `style` as a full, strict paragraph like the app defaults on the `style` field (medium, texture, palette, then composition). Do not pass a short label such as "watercolor". Image models pack the frame with text, charts, diagrams, and extra objects unless the style forbids that. Every style must keep the picture simple: one uncluttered subject in the middle half of the frame, empty margins, and no on-image text or diagrams unless the user asked for one specific word or number. Omit `style` for the Realistic default (`Photorealistic photograph, natural lighting`).
 
 Upload required files first (`open_uploader`, `upload_file`, or `create_file_upload`). See `get_getting_started_guidance`.
 
-Wait until the workflow run is **`succeeded`** (poll with `get_workflow_run` on hosted if needed). Keep **`projectId`**.
+Wait until the workflow run is **`succeeded`**. When `autoExport` is on (the default), the result includes **`downloadUrl`**. Keep **`projectId`** for later remix or a second export.
 
-### Step 2 — Optional remix
+### Step 2 — Optional remix (before export)
+
+If the user wants captions, transitions, zoom, or Convert images to videos **in the MP4**, set `autoExport: false` on the workflow tool, wait until succeeded, then call `remix_project` **before** `export_project`. Remix after auto-export does not change the already-rendered file.
 
 Call `remix_project` with `projectId` and ordered `edits`:
 
@@ -57,11 +61,11 @@ Pass `saveAsNewProject: true` to edit a copy and leave the original alone.
 
 Poll `list_project_remix_actions` until remix actions succeed before exporting if those edits must appear in the MP4.
 
-### Step 3 — Export
+### Step 3 — Export (only if autoExport was false)
 
-Call `export_project` with `projectId`. When status is `succeeded`, give the user `downloadUrl` (or keep polling with `get_project_export` on hosted). MCP always exports with `AUTO` branding (a VideoGen watermark and short end screen may appear depending on the account). Do not pass `watermarkMode` or `endScreenMode`.
+If you set `autoExport: false`, call `export_project` with `projectId`. When status is `succeeded`, give the user `downloadUrl` (or keep polling with `get_project_export` on hosted). MCP always exports with `AUTO` branding (a VideoGen watermark and short end screen may appear depending on the account). Do not pass `watermarkMode` or `endScreenMode`.
 
-That is the full intended product loop: **workflow → remix → export**.
+When `autoExport` stayed true, skip this step: the workflow result already has `downloadUrl`.
 
 ---
 
@@ -107,7 +111,7 @@ One short AI clip inside an editable project (duration up to about 30 seconds; c
 
 MCP `remix_project` exposes a curated subset of remix actions as `edits`. The full REST API supports more action types (music file, logo file, translate, upscale, and others) via `POST /v1/projects/{projectId}/remix`. If the user needs an edit that is not `CAPTIONS` / `TRANSITIONS` / `CONVERT_IMAGES_TO_VIDEOS` / `ZOOM`, say so and point them at the REST/SDK remix API or the VideoGen editor (`projectUrl` / `get_app_deep_link`).
 
-When starting a workflow through the REST SDK, callers often pass `remixActions` in the same request so polish runs after build. MCP workflow tools focus on creation; apply polish with `remix_project` after success unless the specific workflow tool documents inline remix fields.
+When starting a workflow through the REST SDK, callers pass `remixActions` and `autoExport: true` in the same request so polish runs before the MP4. MCP workflow tools default `autoExport` on without inline remix; apply polish with `remix_project` only after setting `autoExport: false` on the workflow start.
 
 Recommended cheap polish: `CAPTIONS` + `ZOOM` (or `TRANSITIONS` + `ZOOM`). Only add `CONVERT_IMAGES_TO_VIDEOS` when the user explicitly asked to turn stills into generated video clips. Do not treat “animate,” “motion,” or “zoom” as that edit.
 
@@ -116,7 +120,7 @@ Recommended cheap polish: `CAPTIONS` + `ZOOM` (or `TRANSITIONS` + `ZOOM`). Only 
 ## Listing and cancelling
 
 - `list_workflow_runs`: recent runs
-- `get_workflow_run`: status / progress / project ids
+- `get_workflow_run`: status / progress / project ids / `downloadUrl` when auto-export finished
 - `cancel_workflow_run`: best-effort cancel
 - `list_projects` / `get_project`: project metadata and share URL
 
@@ -124,7 +128,7 @@ Recommended cheap polish: `CAPTIONS` + `ZOOM` (or `TRANSITIONS` + `ZOOM`). Only 
 
 ## Common mistakes
 
-1. **Skipping export.** A succeeded workflow leaves an editable project; the user usually still wants `export_project` for an MP4.
+1. **Skipping the MP4.** A succeeded workflow with default `autoExport` includes `downloadUrl`. Give that URL to the user. Only skip auto-export when you need `remix_project` first, then call `export_project`.
 2. **Remix or export before workflow `succeeded`.**
 3. **Using a media tool when the user asked for a full video.** Prefer a workflow.
 4. **Forgetting uploads** before voiceover / slideshow / logo-related flows.

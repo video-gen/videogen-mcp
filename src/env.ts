@@ -1,18 +1,11 @@
 const DEFAULT_BASE_URL = "https://api.videogen.io";
 
-const VIDEOGEN_ENVIRONMENTS = [
-  "LOCAL",
-  "DEV",
-  "STAGING",
-  "PRERELEASE",
-  "PROD",
-] as const;
+const VIDEOGEN_ENVIRONMENTS = ["LOCAL", "DEV", "PRERELEASE", "PROD"] as const;
 
 export type VideogenEnvironment = (typeof VIDEOGEN_ENVIRONMENTS)[number];
 
 const HOSTED_VIDEOGEN_ENVIRONMENTS = [
   "DEV",
-  "STAGING",
   "PRERELEASE",
   "PROD",
 ] as const satisfies readonly VideogenEnvironment[];
@@ -133,8 +126,6 @@ function readPublicOrigin(): string | null {
       return "https://prerelease.mcp.videogen.io";
     case "DEV":
       return "https://dev.mcp.videogen.io";
-    case "STAGING":
-      return "https://staging.mcp.videogen.io";
     case "LOCAL":
       return null;
   }
@@ -211,8 +202,6 @@ const getDefaultBaseUrl = ({
       return "https://prerelease.api.videogen.io";
     case "DEV":
       return "https://dev.api.videogen.io";
-    case "STAGING":
-      return "https://staging.api.videogen.io";
     case "LOCAL":
       return DEFAULT_BASE_URL;
   }

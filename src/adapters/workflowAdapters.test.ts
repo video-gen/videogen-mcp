@@ -10,13 +10,18 @@ import {
 
 const mcpVisualStyle = {
   type: "AI_IMAGE" as const,
-  aiStyle: "cinematic photo-real footage",
+  aiStyle: "Photorealistic photograph, natural lighting",
   restyleFeaturedBRollWithAiStyle: true,
 };
 
 const mcpWorkflowDefaults = {
   isOutputTemporary: false,
   hideFromUi: false,
+  autoExport: true,
+  exportOptions: {
+    watermarkMode: "AUTO",
+    endScreenMode: "AUTO",
+  },
 };
 
 describe("workflow MCP adapters", () => {

@@ -146,6 +146,36 @@ const workflowRunSchema = z
     projectId: z.string().describe("Project created for this run (vg_proj_...)."),
     projectUrl: z.string().describe("Deep link to the project in the VideoGen editor."),
     error: apiErrorSchema,
+    exportId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Export id when autoExport succeeded (vg_expo_...)."),
+    downloadUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Signed MP4 download URL when autoExport succeeded. Give this to the user."),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Unix expiry for downloadUrl."),
+    exportFileId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("File id of the rendered MP4 when autoExport succeeded."),
+    thumbnailUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Signed thumbnail URL when autoExport succeeded."),
+    thumbnailUrlExpiresAt: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Unix expiry for thumbnailUrl."),
   })
   .passthrough()
   .describe("Workflow run status snapshot.");
@@ -316,10 +346,30 @@ export const workflowRunOutputSchema = z
       .describe("Completion progress 0-100 (present after polling)."),
     attemptIndex: z.number().optional().describe("Current or latest attempt index."),
     error: apiErrorSchema.optional(),
+    exportId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Export id when autoExport succeeded (vg_expo_...)."),
+    downloadUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Signed MP4 download URL when autoExport succeeded. Give this to the user."),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Unix expiry for downloadUrl."),
+    exportFileId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("File id of the rendered MP4 when autoExport succeeded."),
   })
   .passthrough()
   .describe(
-    "Workflow start metadata, or full run status after waiting (status/progress when polled).",
+    "Workflow start metadata, or full run status after waiting. When autoExport is on (the default), succeeded includes downloadUrl.",
   );
 
 export const listWorkflowRunsOutputSchema = z

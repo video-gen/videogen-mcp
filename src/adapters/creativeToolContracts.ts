@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { MCP_AI_STYLE_FIELD_DESCRIPTION } from "./aiStylePresetExamples";
 
-export const DEFAULT_MCP_AI_STYLE = "cinematic photo-real footage";
+export { DEFAULT_MCP_AI_STYLE } from "./aiStylePresetExamples";
 
 /**
  * Creative MCP inputs use `z.object` (unknown keys stripped), not
@@ -37,11 +38,7 @@ const storyboardImageQualitySchema = z
     "Image generation quality for scene opening frames. Optional; defaults to HIGH. Does not change video generation quality.",
   );
 
-const styleSchema = z
-  .string()
-  .min(1)
-  .optional()
-  .describe("Visual style in plain language. Omit for cinematic photo-real AI images.");
+const styleSchema = z.string().min(1).optional().describe(MCP_AI_STYLE_FIELD_DESCRIPTION);
 
 const languageSchema = z
   .string()
@@ -64,6 +61,13 @@ const actorEntityIdSchema = z
     "Id of an ACTOR entity (vg_enti_...) with an image reference. When set, narration is delivered by that actor avatar.",
   );
 
+const autoExportSchema = z
+  .boolean()
+  .optional()
+  .describe(
+    "When true (the default), the run stays in progress until an MP4 is ready. Use downloadUrl from the result. Set false only if you will call remix_project and then export_project yourself.",
+  );
+
 export const scriptToVideoInputSchema = z.object({
   script: z.string().min(1).describe("Narration script, spoken verbatim."),
   style: styleSchema,
@@ -73,6 +77,7 @@ export const scriptToVideoInputSchema = z.object({
   voiceId: voiceIdSchema,
   actorEntityId: actorEntityIdSchema,
   avatarQuality: avatarQualitySchema.optional(),
+  autoExport: autoExportSchema,
 });
 
 export const voiceoverToVideoInputSchema = z.object({
@@ -81,6 +86,7 @@ export const voiceoverToVideoInputSchema = z.object({
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: imageQualitySchema.optional(),
   language: languageSchema,
+  autoExport: autoExportSchema,
 });
 
 export const slideshowToVideoInputSchema = z.object({
@@ -100,6 +106,7 @@ export const slideshowToVideoInputSchema = z.object({
     .describe(
       "Optional id of a SLIDESHOW_THEME entity (vg_enti_...) whose reference board defines the shared slide design system. Omit when converting an uploaded deck's original pages; VideoGen derives a theme from those pages in the background.",
     ),
+  autoExport: autoExportSchema,
 });
 
 const storyboardSceneSchema = z.object({
@@ -124,6 +131,7 @@ export const storyboardToVideoInputSchema = z.object({
   style: styleSchema,
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: storyboardImageQualitySchema.optional(),
+  autoExport: autoExportSchema,
 });
 
 export const promptToVideoClipInputSchema = z.object({
@@ -136,6 +144,7 @@ export const promptToVideoClipInputSchema = z.object({
   durationSeconds: z.number().int().min(1).max(30).optional(),
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: videoQualitySchema.optional(),
+  autoExport: autoExportSchema,
 });
 
 export const generateImageInputSchema = z.object({
@@ -192,7 +201,14 @@ export const generateVideoClipInputSchema = z
       .describe(
         "When true, the clip will not include a musical soundtrack. Spoken dialogue and environmental sound are still allowed. Use this when background music will be added separately.",
       ),
-    durationSeconds: z.number().int().min(1).max(30).nullable().optional(),
+    durationSeconds: z
+      .number()
+      .int()
+      .min(1)
+      .max(30)
+      .nullable()
+      .optional()
+      .describe("Optional clip length in whole seconds (1 to 30). Omit or pass null for Auto."),
     aspectRatio: creativeAspectRatioSchema.optional(),
     quality: videoQualitySchema.optional(),
   })

@@ -24,7 +24,32 @@ type PromptToVideoClipInput = z.infer<typeof promptToVideoClipInputSchema>;
 
 const mcpWorkflowDefaults = {
   isOutputTemporary: false as const,
+  // Keep generated files on the dashboard. MCP users make one-off projects and
+  // expect them to appear in the app. Hiding from the UI is opt-in on the API.
   hideFromUi: false as const,
+};
+
+const mcpAutoExportFields = ({
+  autoExport,
+}: {
+  autoExport: boolean | undefined;
+}): {
+  autoExport: boolean;
+  exportOptions?: { watermarkMode: "AUTO"; endScreenMode: "AUTO" };
+} => {
+  const shouldAutoExport = autoExport ?? true;
+
+  if (!shouldAutoExport) {
+    return { autoExport: false };
+  }
+
+  return {
+    autoExport: true,
+    exportOptions: {
+      watermarkMode: "AUTO",
+      endScreenMode: "AUTO",
+    },
+  };
 };
 
 export function toScriptToVideoRequest(input: ScriptToVideoInput): ScriptToVideoRequest {
@@ -32,6 +57,7 @@ export function toScriptToVideoRequest(input: ScriptToVideoInput): ScriptToVideo
     script: input.script,
     visualStyle: styleToVisualStyle({ style: input.style }),
     ...mcpWorkflowDefaults,
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
     ...(input.language != null && { language: input.language }),
@@ -48,6 +74,7 @@ export function toVoiceoverToVideoRequest(
     fileId: input.fileId,
     visualStyle: styleToVisualStyle({ style: input.style }),
     ...mcpWorkflowDefaults,
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
     ...(input.language != null && { language: input.language }),
@@ -60,6 +87,7 @@ export function toSlideshowToVideoRequest(
   return {
     fileId: input.fileId,
     ...mcpWorkflowDefaults,
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.slideScripts != null && { slideScripts: input.slideScripts }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.language != null && { language: input.language }),
@@ -84,6 +112,7 @@ export function toStoryboardToVideoRequest(
     })),
     defaultGeneration: { aiStyle: input.style ?? DEFAULT_MCP_AI_STYLE },
     ...mcpWorkflowDefaults,
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
   };
@@ -95,6 +124,7 @@ export function toPromptToVideoClipRequest(
   return {
     prompt: input.prompt,
     ...mcpWorkflowDefaults,
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
     ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),

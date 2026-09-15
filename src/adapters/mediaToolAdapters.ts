@@ -43,6 +43,8 @@ type Image3dEffectInput = z.infer<typeof image3dEffectInputSchema>;
 const mcpMediaDefaults = {
   numResults: 1 as const,
   isOutputTemporary: false as const,
+  // Keep generated files on the dashboard. MCP users make one-off projects and
+  // expect them to appear in the app. Hiding from the UI is opt-in on the API.
   hideFromUi: false as const,
 };
 

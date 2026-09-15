@@ -66,6 +66,63 @@ void test("appDeepLinkActionFromToolArgs requires articleSlug for OPEN_HELP_ARTI
   });
 });
 
+void test("appDeepLinkActionFromToolArgs omits retired locale suggestions", () => {
+  assert.deepEqual(
+    appDeepLinkActionFromToolArgs({
+      action: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "nl",
+    }),
+    {
+      type: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: null,
+    },
+  );
+  assert.deepEqual(
+    appDeepLinkActionFromToolArgs({
+      action: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "zz",
+    }),
+    {
+      type: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: null,
+    },
+  );
+  assert.deepEqual(
+    appDeepLinkActionFromToolArgs({
+      action: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "es",
+    }),
+    {
+      type: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "es",
+    },
+  );
+});
+
+void test("buildAppDeepLinkUrl never emits a retired or unknown locale suggestion", () => {
+  assert.equal(
+    buildAppDeepLinkUrl({
+      type: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "nl",
+    }),
+    "https://app.videogen.io/settings/account?vg_action=OPEN_LANGUAGE_SELECTOR",
+  );
+  assert.equal(
+    buildAppDeepLinkUrl({
+      type: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "zz",
+    }),
+    "https://app.videogen.io/settings/account?vg_action=OPEN_LANGUAGE_SELECTOR",
+  );
+  assert.equal(
+    buildAppDeepLinkUrl({
+      type: "OPEN_LANGUAGE_SELECTOR",
+      suggestedLocale: "es",
+    }),
+    "https://app.videogen.io/settings/account?vg_action=OPEN_LANGUAGE_SELECTOR&vg_locale=es",
+  );
+});
+
 void test("getIsMcpCommerceDeepLinkAction covers purchase flows used by STANDARD MCP", async () => {
   const { getIsMcpCommerceDeepLinkAction } = await import("./hostSurface");
   assert.equal(getIsMcpCommerceDeepLinkAction({ action: "OPEN_UPGRADE" }), true);

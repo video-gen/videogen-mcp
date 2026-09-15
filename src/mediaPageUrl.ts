@@ -16,7 +16,6 @@ const APP_BASE_URL_BY_ENV: Record<VideogenEnvironment, string> = {
   PROD: "https://app.videogen.io",
   PRERELEASE: "https://prerelease.app.videogen.io",
   DEV: "https://dev.app.videogen.io",
-  STAGING: "https://staging.app.videogen.io",
   LOCAL: "http://localhost:3000",
 };
 

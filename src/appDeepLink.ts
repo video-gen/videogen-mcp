@@ -20,6 +20,49 @@ const LOCALE_PARAM = "vg_locale";
 
 const MAX_FEEDBACK_TEXT_LENGTH = 500;
 
+// Kept local because the published MCP package cannot depend on internal workspace packages.
+// Must stay identical to `APP_LOCALES` in `static/src/app/locales.ts`.
+const ACTIVE_APP_DEEP_LINK_LOCALES = [
+  "cs",
+  "de",
+  "el",
+  "en",
+  "es",
+  "fr",
+  "hr",
+  "hu",
+  "id",
+  "it",
+  "ja",
+  "ko",
+  "pl",
+  "pt",
+  "ro",
+  "th",
+  "tr",
+  "uk",
+  "vi",
+  "zh",
+] as const;
+
+const ACTIVE_APP_DEEP_LINK_LOCALE_SET = new Set<string>(ACTIVE_APP_DEEP_LINK_LOCALES);
+
+const getSupportedSuggestedLocaleOrNull = ({
+  suggestedLocale,
+}: {
+  suggestedLocale: string | null | undefined;
+}): string | null => {
+  if (suggestedLocale == null || suggestedLocale.length === 0) {
+    return null;
+  }
+
+  if (!ACTIVE_APP_DEEP_LINK_LOCALE_SET.has(suggestedLocale)) {
+    return null;
+  }
+
+  return suggestedLocale;
+};
+
 const RATE_CARD_URL = "https://videogen.io/rate-card";
 const HELP_DOCS_BASE_URL = "https://help.videogen.io";
 const API_DOCS_URL = "https://docs.videogen.io";
@@ -70,8 +113,6 @@ const getAppBaseUrl = (environment: VideogenEnvironment): string => {
       return "https://prerelease.app.videogen.io";
     case "DEV":
       return "https://dev.app.videogen.io";
-    case "STAGING":
-      return "https://staging.app.videogen.io";
     case "LOCAL":
       return "http://localhost:3000";
   }
@@ -189,8 +230,11 @@ export function buildAppDeepLinkUrl(action: AppDeepLinkAction): string {
     case "OPEN_LANGUAGE_SELECTOR": {
       const searchParams = new URLSearchParams();
       searchParams.set(ACTION_PARAM, action.type);
-      if (action.suggestedLocale != null && action.suggestedLocale.length > 0) {
-        searchParams.set(LOCALE_PARAM, action.suggestedLocale);
+      const suggestedLocale = getSupportedSuggestedLocaleOrNull({
+        suggestedLocale: action.suggestedLocale,
+      });
+      if (suggestedLocale != null && suggestedLocale.length > 0) {
+        searchParams.set(LOCALE_PARAM, suggestedLocale);
       }
       return appendSearchParams({
         baseUrl: joinAppUrl({ baseUrl: appBase, path: "/settings/account" }),
@@ -258,9 +302,13 @@ export function appDeepLinkActionFromToolArgs(args: {
       };
     }
     case "OPEN_LANGUAGE_SELECTOR": {
+      const suggestedLocale = getSupportedSuggestedLocaleOrNull({
+        suggestedLocale: args.suggestedLocale,
+      });
+
       return {
         type: "OPEN_LANGUAGE_SELECTOR",
-        suggestedLocale: args.suggestedLocale ?? null,
+        suggestedLocale,
       };
     }
     case "NAVIGATE": {

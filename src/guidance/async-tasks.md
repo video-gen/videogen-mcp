@@ -32,7 +32,7 @@ Tell the user a realistic wait **before or as you start**. Do not imply the resu
 | `generate_video_clip` | about 1–3 minutes (HIGH/MAX can be longer) |
 | `generate_motion_graphic` | about 2–5 minutes (writes animation code, then renders; complex prompts can take longer) |
 | `generate_avatar`, `generate_music` | often a few minutes |
-| Full workflows (`script_to_video`, …) and `export_project` | several minutes |
+| Full workflows (`script_to_video`, …) with default auto-export | several minutes for the video, then more for the MP4 |
 
 Keep polling calmly. Quote `progressPercentage` when present. Do not start a second generation just because the first one is still running.
 

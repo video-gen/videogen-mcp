@@ -2,23 +2,23 @@ $ tsup && tsup --config tsup.widget.config.ts
 CLI Building entry: src/http.ts, src/index.ts, src/smoke.ts
 CLI Using tsconfig: tsconfig.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-ship-chatgpt-app-for-videogen/mcp/tsup.config.ts
+CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.config.ts
 CLI Target: node20
 CLI Cleaning output folder
 ESM Build start
-ESM dist/index.js     115.53 KB
+ESM dist/http.js      148.24 KB
+ESM dist/index.js     127.87 KB
 ESM dist/smoke.js     33.75 KB
-ESM dist/http.js      135.96 KB
 ESM dist/smoke.js.map 69.05 KB
-ESM dist/index.js.map 244.82 KB
-ESM dist/http.js.map  295.09 KB
-ESM ⚡️ Build success in 49ms
+ESM dist/http.js.map  313.27 KB
+ESM dist/index.js.map 263.03 KB
+ESM ⚡️ Build success in 34ms
 CLI Building entry: {"uploadWidget":"web/uploadWidget.tsx","mediaPreviewWidget":"web/mediaPreviewWidget.tsx"}
 CLI Using tsconfig: web/tsconfig.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-ship-chatgpt-app-for-videogen/mcp/tsup.widget.config.ts
+CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.widget.config.ts
 CLI Target: es2020
 IIFE Build start
 IIFE dist/widget/mediaPreviewWidget.global.js 197.45 KB
 IIFE dist/widget/uploadWidget.global.js       193.39 KB
-IIFE ⚡️ Build success in 69ms
+IIFE ⚡️ Build success in 48ms
