@@ -8,12 +8,18 @@ Learn more about the [VideoGen MCP server](https://videogen.io/videogen-mcp).
 
 Find the hosted server on [Smithery](https://smithery.ai/servers/videogen/videogen).
 
-It ships in two transports. Tool surface is the same except for ChatGPT Apps commerce policy (see below):
+## ChatGPT
+
+Use the public [VideoGen plugin on the ChatGPT Plugins Directory](https://chatgpt.com/plugins/plugin_asdk_app_6a7632963b6c8191b3da907392ba6676). That is the supported way for every user to run VideoGen in ChatGPT.
+
+The `/mcp/chatgpt` endpoint, ChatGPT Apps commerce notes, `open_uploader` widget, and the connector checklist later in this file are for **internal testing** of that plugin.
+
+It ships in two transports. Tool surface is the same except for the internal-testing ChatGPT Apps surface (see above):
 
 - **Local (stdio)** — the client launches `@videogen/mcp` as a subprocess and reads the key from `VIDEOGEN_API_KEY`.
 - **Remote (Streamable HTTP)** — a hosted, multi-tenant HTTP server. Clients connect over the network and authenticate per request with `Authorization: Bearer <api-key>`; no key lives on the server.
 
-**Host surfaces (remote):** `/mcp` (and stdio) is the **STANDARD** surface: when the user is out of credits or needs a plan feature, tools and guidance walk them into `get_app_deep_link` (`OPEN_UPGRADE` / `OPEN_PURCHASE_CREDITS` / `OPEN_ENABLE_TOP_UPS`). `/mcp/chatgpt` is the **ChatGPT Apps** surface: those commerce deep links are omitted, billing errors are rewritten to “manage your VideoGen account,” and copy never says purchase / buy / upgrade / top-ups (OpenAI Plugins digital-goods policy). See `.cursor/rules/chatgpt-mcp-no-commerce.mdc` and `mcp/src/hostSurface.ts`.
+**Host surfaces (remote):** `/mcp` (and stdio) is the **STANDARD** surface: when the user is out of credits or needs a plan feature, tools and guidance walk them into `get_app_deep_link` (`OPEN_UPGRADE` / `OPEN_PURCHASE_CREDITS` / `OPEN_ENABLE_TOP_UPS`). `/mcp/chatgpt` is an **internal-testing** ChatGPT Apps surface for the public plugin: those commerce deep links are omitted, billing errors are rewritten to “manage your VideoGen account,” and copy never says purchase / buy / upgrade / top-ups (OpenAI Plugins digital-goods policy). See `.cursor/rules/chatgpt-mcp-no-commerce.mdc` and `mcp/src/hostSurface.ts`.
 
 This is distinct from the hosted **documentation** MCP at `https://docs.videogen.io/_mcp/server`, which only lets clients read the API docs. This server actually _executes_ the API.
 
@@ -48,10 +54,10 @@ Nothing to install or update. Point any MCP client that supports the Streamable 
 The remote server:
 
 - Accepts MCP JSON-RPC messages via `POST /mcp` (stateless — a fresh server per request).
-- Reads the API key or OAuth access token from the `Authorization: Bearer` header. The standard `/mcp` endpoint requires credentials for every request and returns `401` with a `WWW-Authenticate` challenge to start OAuth. The ChatGPT-specific `/mcp/chatgpt` endpoint serves tool discovery unauthenticated and returns its OAuth challenge on a protected tool result because ChatGPT does not start OAuth from the standard transport challenge. The credential is forwarded only to the VideoGen API and never stored.
+- Reads the API key or OAuth access token from the `Authorization: Bearer` header. The standard `/mcp` endpoint requires credentials for every request and returns `401` with a `WWW-Authenticate` challenge to start OAuth. The internal-testing `/mcp/chatgpt` endpoint serves tool discovery unauthenticated and returns its OAuth challenge on a protected tool result because ChatGPT does not start OAuth from the standard transport challenge. The credential is forwarded only to the VideoGen API and never stored.
 - Exposes `GET /health` for load-balancer / Cloud Run startup probes.
 - Handles CORS preflight (`OPTIONS`) so browser-based clients can connect.
-- Supports three upload paths. For small assets (images, logos, short audio), `upload_file` takes base64-encoded contents inline (`fileData`). For large files, `create_file_upload` returns `{ fileId, uploadUrl }`; the client `PUT`s the raw bytes to that short-lived pre-signed URL (no `Authorization` header) and then calls `get_file` with `{ fileId, wait: true }` to wait for processing. In **ChatGPT** (an MCP Apps host), `open_uploader` renders an in-chat upload widget so the user can pick a file directly: the widget itself calls `create_file_upload`, `PUT`s the bytes client-side, and reports back only the resulting `vg_file_...` id, so the pre-signed URL is never surfaced to the model. Either way you get a `vg_file_...` id to pass to other tools. The local (stdio) server instead uploads by local `filePath`. (The server never fetches a caller-supplied URL, so there is no SSRF surface.)
+- Supports three upload paths. For small assets (images, logos, short audio), `upload_file` takes base64-encoded contents inline (`fileData`). For large files, `create_file_upload` returns `{ fileId, uploadUrl }`; the client `PUT`s the raw bytes to that short-lived pre-signed URL (no `Authorization` header) and then calls `get_file` with `{ fileId, wait: true }` to wait for processing. On the internal-testing `/mcp/chatgpt` surface, `open_uploader` renders an in-chat upload widget so the user can pick a file directly: the widget itself calls `create_file_upload`, `PUT`s the bytes client-side, and reports back only the resulting `vg_file_...` id, so the pre-signed URL is never surfaced to the model. Either way you get a `vg_file_...` id to pass to other tools. The local (stdio) server instead uploads by local `filePath`. (The server never fetches a caller-supplied URL, so there is no SSRF surface.)
 
 ### Local (stdio) — Cursor / Claude Desktop
 
@@ -79,7 +85,7 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 | `VIDEOGEN_BASE_URL` | no         | `https://api.videogen.io` | Override the upstream API base URL (e.g. for local development). Applies to both transports. When unset, the remote server resolves the upstream API per deployment environment (dev/prerelease/prod); local runs default to the public prod API. |
 | `VIDEOGEN_OAUTH_ISSUER` | no     | —                         | Remote server only. Full OAuth 2.1 issuer URL. When set (or derived from the var below), the server advertises OAuth protected-resource metadata (RFC 9728) and a `resource_metadata` 401 challenge so MCP clients can discover the authorization server and run account linking. Must match the issuer that the upstream API (`VIDEOGEN_BASE_URL`) validates tokens against. |
 | `VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL` | no | —             | Remote server only. Supabase project base URL; the issuer is derived as `${url}/auth/v1`. Ignored when `VIDEOGEN_OAUTH_ISSUER` is set. |
-| `VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN` | no | —            | Remote server only. Public OpenAI Plugins / ChatGPT Apps domain-verification token. When set, `GET /.well-known/openai-apps-challenge` returns that exact value as `text/plain`. When unset, that path is a non-JSON-RPC 404. |
+| `VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN` | no | —            | Remote server only. Internal-testing OpenAI Plugins / ChatGPT Apps domain-verification token for the public plugin. When set, `GET /.well-known/openai-apps-challenge` returns that exact value as `text/plain`. When unset, that path is a non-JSON-RPC 404. |
 
 ## Tools
 
@@ -101,7 +107,7 @@ See the [callable tool reference](./TOOL_SCHEMAS.md) and [complete input/output 
 
 `upload_file`, `create_file_upload`, `get_file`, `list_files`, `open_uploader`
 
-`open_uploader` is a **ChatGPT App** widget (remote server only): it renders an in-chat file picker (a React component served as an MCP UI resource) so a ChatGPT user can attach a file without pasting a link. It is a no-op on clients that don't render MCP Apps UI — those use `upload_file` / `create_file_upload` instead.
+`open_uploader` is a widget on the **internal-testing** `/mcp/chatgpt` surface (remote server only): it renders an in-chat file picker (a React component served as an MCP UI resource) so a ChatGPT user can attach a file without pasting a link. It is a no-op on clients that don't render MCP Apps UI — those use `upload_file` / `create_file_upload` instead. ChatGPT users should use the [public VideoGen plugin](https://chatgpt.com/plugins/plugin_asdk_app_6a7632963b6c8191b3da907392ba6676).
 
 ### Entities
 
@@ -172,7 +178,9 @@ CI/CD builds and deploys the Cloud Run service, but a couple of steps must be do
 1. **Custom domain / DNS.** The service is reachable at its generated `*.run.app` URL immediately. To serve it at `mcp.videogen.io`, create a Cloud Run **domain mapping** (or add it behind the existing load balancer) and add the corresponding DNS record. Update the `url` in the client config above once the domain resolves.
 2. **Verify the first deploy.** After the first successful deploy, confirm `GET https://<service-url>/health` returns `200` and that a `POST /mcp` with a valid bearer token lists tools.
 
-### ChatGPT connector (OAuth) checklist
+### ChatGPT connector (OAuth) checklist (internal testing)
+
+This checklist is for VideoGen engineers testing the public [VideoGen plugin](https://chatgpt.com/plugins/plugin_asdk_app_6a7632963b6c8191b3da907392ba6676). Users install that plugin from the ChatGPT Plugins Directory.
 
 After deploying the remote MCP server for an environment (e.g. DEV → `https://dev.mcp.videogen.io/mcp`):
 
