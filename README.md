@@ -2,6 +2,8 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that exposes the full [VideoGen API](https://docs.videogen.io) to any MCP client (Cursor, Claude Desktop, Windsurf, etc.). Your agent can generate videos from scripts, produce images / voiceovers / music / avatars, upload files, export and remix projects, and manage runs — all authenticated with your own API key.
 
+Learn more about the [VideoGen MCP server](https://videogen.io/videogen-mcp).
+
 Find the hosted server on [Smithery](https://smithery.ai/servers/videogen/videogen).
 
 It ships in two transports. Tool surface is the same except for ChatGPT Apps commerce policy (see below):
