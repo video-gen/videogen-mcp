@@ -83,6 +83,8 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 
 ## Tools
 
+See the [callable tool reference](./TOOL_SCHEMAS.md) and [complete input/output JSON schemas](./tool-schemas.json) for 50 live hosted tools. The schema snapshot is captured from MCP `tools/list`; use discovery on your connected server for the latest definitions.
+
 ### Workflows (end-to-end video)
 
 `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `list_workflow_runs`, `get_workflow_run`, `cancel_workflow_run`
