@@ -6,6 +6,12 @@ export type OpenAiToolResult = {
   isError?: boolean;
 };
 
+export type OpenAiSelectedFile = {
+  fileId: string;
+  fileName?: string;
+  mimeType?: string;
+};
+
 /**
  * The `window.openai` bridge injected by ChatGPT when a widget runs inside its
  * sandboxed iframe. Declared once here (rather than per widget) so multiple
@@ -23,7 +29,11 @@ export type OpenAiHost = {
   setWidgetState?: (state: Record<string, unknown>) => Promise<void> | void;
   sendFollowUpMessage?: (args: { prompt: string }) => Promise<void> | void;
   toolOutput?: unknown;
+  /** Arguments the model passed to the tool that opened this widget. */
+  toolInput?: unknown;
   openExternal?: (args: { href: string; redirectUrl?: boolean }) => void;
+  selectFiles?: () => Promise<OpenAiSelectedFile[]>;
+  getFileDownloadUrl?: (args: { fileId: string }) => Promise<{ downloadUrl: string }>;
 };
 
 declare global {

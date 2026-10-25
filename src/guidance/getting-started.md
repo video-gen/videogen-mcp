@@ -36,7 +36,7 @@ If this fails with 401, stop and fix auth before starting workflows or tools (th
 
 | Goal | What to use |
 | --- | --- |
-| Full narrated multi-scene video (editable project plus MP4) | A workflow tool: prefer `script_to_video` for ~1 minute+ / informational text; use `storyboard_to_video` only for short shot lists (≤ 3 scenes unless the user asks for more); also `voiceover_to_video`, `slideshow_to_video`, `prompt_to_video_clip`. Wait for `downloadUrl`. |
+| Full narrated multi-scene video (editable project plus MP4) | A workflow tool: prefer `script_to_video` for ~1 minute+ / informational text; use `storyboard_to_video` only for short shot lists (≤ 3 scenes unless the user asks for more); also `voiceover_to_video`, `slideshow_to_video`, `prompt_to_video_clip`, and `video_to_video` to restyle an existing video (an uploaded file or a public link). Wait for `downloadUrl`. |
 | One image, clip, voiceover, music, avatar, or transform | A media tool: `generate_image`, `generate_video_clip`, `text_to_speech`, etc. |
 | Reusable actor / product / visual style | `create_entity` + `add_entity_reference` (upload the image first), then pass `vg_enti_...` into workflows / `generate_avatar` |
 | Polish an existing project | `remix_project` with curated `edits` |
@@ -80,9 +80,11 @@ Numeric timestamps from the API are **seconds** since the Unix epoch (UTC), not 
 
 Many flows need a prior upload (voiceover audio, slideshow PDF, logo, reference images):
 
-- **ChatGPT (hosted)**: prefer `open_uploader` so the user picks a file in-chat.
+<!-- mcp-host-upload-guidance -->
+- **ChatGPT (hosted)**: call `open_uploader`. When the user already attached files in the chat, pass them in `files`. A filename is not the file and does not upload it.
 - **Hosted remote**: `upload_file` with inline base64 for small files, or `create_file_upload` then `PUT` bytes to the returned URL, then `get_file` with `wait: true`.
 - **Local stdio**: `upload_file` with a local `filePath`.
+<!-- /mcp-host-upload-guidance -->
 
 Pass the resulting `vg_file_...` into workflow or tool arguments.
 
@@ -92,10 +94,10 @@ Pass the resulting `vg_file_...` into workflow or tool arguments.
 
 Reusable team assets for consistent characters, products, and looks:
 
-1. Upload a reference image (`open_uploader` / `upload_file` / `create_file_upload`).
-2. `create_entity` with `entityType` (`ACTOR` | `PRODUCT` | `VISUAL_STYLE`) and `name`.
+1. Upload a reference image (see Uploading files above).
+2. `create_entity` with `entityType` (`ACTOR` | `PRODUCT` | `LOCATION` | `PROP` | `VISUAL_STYLE`) and `name`. Anything the user sells is a `PRODUCT`, never a `PROP`.
 3. `add_entity_reference` with the image `fileId` and usually `isDefault: true`.
-4. Pass the returned `vg_enti_...` as `actorEntityId` on `generate_avatar` / `script_to_video`, or as product/style entity ids on storyboard scenes.
+4. Pass the returned `vg_enti_...` as `actorEntityId` on `generate_avatar` / `script_to_video` / `slideshow_to_video`. On `storyboard_to_video`, pass `productEntityIds` or `actorEntityIds` on the request and on each scene that should show that reference, and `visualStyleEntityId` on each scene for a visual style.
 
 Also: `list_entities`, `get_entity`, `update_entity`, `remove_entity_reference`, `archive_entity`. Prefer MCP entity tools over sending the user to the app unless they ask to manage entities in the UI (`get_app_deep_link` with `NAVIGATE` → `ENTITIES`).
 

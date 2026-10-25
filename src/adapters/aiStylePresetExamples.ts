@@ -86,9 +86,32 @@ export const DEFAULT_MCP_AI_STYLE = "Photorealistic photograph, natural lighting
 export const MCP_AI_STYLE_COMPOSITION_LOCK =
   "A clear uncluttered subject centered in the frame, occupying only the middle half of the image, with generous empty margins on all four sides, no background clutter. No on-image text, letters, labels, captions, charts, diagrams, tables, legends, or infographic layout unless the user explicitly asked for one specific word or number on screen.";
 
+/**
+ * Markdown table of every app default, for guidance documents and server
+ * instructions. Models copy a short label unless the full prompt is in context.
+ */
+export const formatMcpAiStylePresetExamplesMarkdown = (): string => {
+  const rows = MCP_AI_STYLE_PRESET_EXAMPLES.map(
+    (example) => `| ${example.name} | ${example.prompt} |`,
+  ).join("\n");
+
+  return [
+    "## Default AI styles",
+    "",
+    "Pass `style` as one full prompt from this table, copied verbatim. A short label such as \"watercolor\", \"cinematic\", or \"photo-real\" is not a style and produces crowded, generic images. Omit `style` only for the Realistic default.",
+    "",
+    "A custom style is allowed only when it is equally long and strict and includes this composition lock verbatim:",
+    "",
+    MCP_AI_STYLE_COMPOSITION_LOCK,
+    "",
+    "| Name | Prompt |",
+    "| --- | --- |",
+    rows,
+  ].join("\n");
+};
+
 export const MCP_AI_STYLE_FIELD_DESCRIPTION = [
-  "Visual style for generated images. Write a full, strict paragraph in the same form as the app defaults below: name the medium, texture, and palette, then lock composition. Do not pass a short label such as \"watercolor\", \"flat art\", or \"cinematic\".",
-  `Image models fill the frame with extra objects, readable text, charts, diagrams, tables, and labels unless the style forbids that. The still then looks crowded and hard to use. Every style must keep the picture simple. Include this composition lock verbatim: ${MCP_AI_STYLE_COMPOSITION_LOCK}`,
-  "Copy an app default in full (those already include the uncluttered-subject lock), then add the no-text / no-diagram sentence if it is missing. A custom style is allowed only when it is equally long and strict, and includes the same composition lock. Omit this field for the Realistic default.",
-  ...MCP_AI_STYLE_PRESET_EXAMPLES.map((example) => `${example.name}: ${example.prompt}`),
+  "Visual style for generated images: a full, strict paragraph describing medium, texture, palette, and composition. Copy a full app default from get_workflows_guidance, or describe a custom look. Omit for the Realistic default.",
+  "Image models can add extra objects, text, charts, diagrams, tables, and labels. To keep the picture simple, include this composition lock verbatim:",
+  MCP_AI_STYLE_COMPOSITION_LOCK,
 ].join("\n");

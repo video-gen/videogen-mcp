@@ -39,9 +39,7 @@ const jobStatusSchema = z
 
 const fileSourceSchema = z
   .object({
-    status: z
-      .enum(["pending", "ready", "failed", "skipped"])
-      .describe("Rendition status."),
+    status: z.enum(["pending", "ready", "failed", "skipped"]).describe("Rendition status."),
     url: z.string().nullish().describe("Signed URL when status is ready."),
     expiresAt: z.number().nullish().describe("Unix expiry for url."),
     width: z.number().nullish().describe("Rendition width in pixels."),
@@ -58,10 +56,7 @@ const fileSourceSchema = z
 const fileInfoSchema = z
   .object({
     fileId: z.string().describe("File id (vg_file_...)."),
-    type: z
-      .string()
-      .nullish()
-      .describe("File type once processing has determined it."),
+    type: z.string().nullish().describe("File type once processing has determined it."),
     scope: z
       .enum(["GLOBAL", "PROJECT", "EXPORT", "TEMPORARY", "ENTITY"])
       .optional()
@@ -72,10 +67,7 @@ const fileInfoSchema = z
       .number()
       .nullish()
       .describe("Duration in seconds for video/audio; null for images."),
-    transcriptText: z
-      .string()
-      .nullish()
-      .describe("Plain transcript text when available."),
+    transcriptText: z.string().nullish().describe("Plain transcript text when available."),
     downloadUrl: z.string().nullish().describe("Signed download URL when ready."),
     downloadUrlExpiresAt: z.number().nullish().describe("Unix expiry for downloadUrl."),
     thumbnailUrl: z.string().nullish().describe("Signed thumbnail URL when available."),
@@ -127,9 +119,7 @@ const executedToolSchema = z
     toolType: z.string().describe("Tool name (e.g. GENERATE_IMAGE)."),
     progressPercentage: z.number().describe("Completion progress 0-100."),
     attemptIndex: z.number().describe("Current or latest attempt index."),
-    results: z
-      .array(toolSuccessResultSchema)
-      .describe("Generated results; empty until succeeded."),
+    results: z.array(toolSuccessResultSchema).describe("Generated results; empty until succeeded."),
     error: apiErrorSchema,
   })
   .passthrough()
@@ -156,11 +146,7 @@ const workflowRunSchema = z
       .nullable()
       .optional()
       .describe("Signed MP4 download URL when autoExport succeeded. Give this to the user."),
-    downloadUrlExpiresAt: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Unix expiry for downloadUrl."),
+    downloadUrlExpiresAt: z.number().nullable().optional().describe("Unix expiry for downloadUrl."),
     exportFileId: z
       .string()
       .nullable()
@@ -191,9 +177,7 @@ const ttsVoiceSchema = z
     supportsDirectToolExecution: z
       .boolean()
       .describe("Whether the voice can be used with text_to_speech directly."),
-    supportsAllLanguages: z
-      .boolean()
-      .describe("Whether the voice can speak any language."),
+    supportsAllLanguages: z.boolean().describe("Whether the voice can speak any language."),
     isDeprecated: z.boolean().describe("Whether the voice is deprecated."),
   })
   .passthrough()
@@ -266,22 +250,14 @@ export const exportProjectOutputSchema = z
       .nullable()
       .optional()
       .describe("Signed MP4 download URL when succeeded; otherwise null."),
-    downloadUrlExpiresAt: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Unix expiry for downloadUrl."),
+    downloadUrlExpiresAt: z.number().nullable().optional().describe("Unix expiry for downloadUrl."),
     thumbnailUrl: z.string().nullable().optional().describe("Signed thumbnail URL when ready."),
     thumbnailUrlExpiresAt: z
       .number()
       .nullable()
       .optional()
       .describe("Unix expiry for thumbnailUrl."),
-    exportFileId: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Exported MP4 file id when succeeded."),
+    exportFileId: z.string().nullable().optional().describe("Exported MP4 file id when succeeded."),
     file: fileInfoSchema.nullable().optional().describe("Hydrated export file metadata."),
     error: apiErrorSchema.optional(),
   })
@@ -356,11 +332,7 @@ export const workflowRunOutputSchema = z
       .nullable()
       .optional()
       .describe("Signed MP4 download URL when autoExport succeeded. Give this to the user."),
-    downloadUrlExpiresAt: z
-      .number()
-      .nullable()
-      .optional()
-      .describe("Unix expiry for downloadUrl."),
+    downloadUrlExpiresAt: z.number().nullable().optional().describe("Unix expiry for downloadUrl."),
     exportFileId: z
       .string()
       .nullable()
@@ -402,15 +374,22 @@ export const toolExecutionOutputSchema = z
     error: apiErrorSchema.optional(),
   })
   .passthrough()
-  .describe(
-    "Tool execution id, or full execution status after waiting (results when succeeded).",
-  );
+  .describe("Tool execution id, or full execution status after waiting (results when succeeded).");
+
+/** Single-execution reads always return the full snapshot, unlike starts. */
+export const getToolExecutionOutputSchema = executedToolSchema;
+
+/** Cancellation acknowledges the request; status is fetched separately. */
+export const cancelToolExecutionOutputSchema = z
+  .object({
+    toolExecutionId: z.string().describe("Execution for which cancellation was requested."),
+  })
+  .passthrough()
+  .describe("Cancellation acknowledgment. Use get_tool_execution for status and results.");
 
 export const listToolExecutionsOutputSchema = z
   .object({
-    toolExecutions: z
-      .array(executedToolSchema)
-      .describe("Tool executions, most recent first."),
+    toolExecutions: z.array(executedToolSchema).describe("Tool executions, most recent first."),
     hasMore: z.boolean().describe("Whether another page is available."),
     nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
   })
@@ -458,6 +437,11 @@ const entityReferenceSchema = z
   .object({
     fileId: z.string().describe("Reference image file id (vg_file_...)."),
     description: z.string().describe("Reference description (empty when unset)."),
+    role: z
+      .enum(["REFERENCE", "BRAND_LOGO", "BRAND_STYLE_GUIDE"])
+      .describe(
+        "REFERENCE for generation and thumbnails; BRAND_LOGO / BRAND_STYLE_GUIDE for a brand's logo and style guide.",
+      ),
     isDefault: z.boolean().describe("True when this is the primary/thumbnail reference."),
   })
   .passthrough()
@@ -475,15 +459,25 @@ const entityActorConfigSchema = z
   .nullable()
   .describe("Voice/avatar summary for ACTOR entities; null for other types.");
 
+const entityBrandConfigSchema = z
+  .object({
+    fonts: z.string().describe("Font guidance."),
+    colors: z.string().describe("Color guidance."),
+    writingStyle: z.string().describe("Voice and tone for copy."),
+  })
+  .nullable()
+  .describe("Brand guidance for BRAND entities; null for other types.");
+
 const entitySchema = z
   .object({
     entityId: z.string().describe("Entity id (vg_enti_...)."),
     entityType: z
-      .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE", "SLIDESHOW_THEME"])
-      .describe("ACTOR, PRODUCT, VISUAL_STYLE, or SLIDESHOW_THEME."),
+      .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE", "SLIDESHOW_THEME", "BRAND", "LOCATION", "PROP"])
+      .describe("ACTOR, PRODUCT, VISUAL_STYLE, SLIDESHOW_THEME, BRAND, LOCATION, or PROP."),
     name: z.string().describe("Display name."),
     description: z.string().describe("Description (empty when unset)."),
     actorConfig: entityActorConfigSchema.optional(),
+    brandConfig: entityBrandConfigSchema.optional(),
     references: z.array(entityReferenceSchema).describe("Attached reference images."),
     createdAt: z.number().describe("Unix created-at timestamp."),
     updatedAt: z.number().describe("Unix updated-at timestamp."),
@@ -493,7 +487,9 @@ const entitySchema = z
       .describe("True for VideoGen catalog entities that cannot be modified."),
   })
   .passthrough()
-  .describe("A reusable actor, product, visual style, or slideshow theme entity.");
+  .describe(
+    "A reusable actor, product, visual style, slideshow theme, brand, location, or prop entity.",
+  );
 
 export const entityOutputSchema = entitySchema;
 
@@ -516,7 +512,7 @@ export const entityArchiveOutputSchema = z
 
 export const openUploaderOutputSchema = z
   .object({
-    status: z.string().describe("Widget status (ready when the uploader UI can open)."),
+    status: z.string().describe("Uploader launch status: ready. This is not an upload completion result; the widget reports the file id after the user uploads."),
   })
   .passthrough()
   .describe("ChatGPT App upload-widget launch result.");

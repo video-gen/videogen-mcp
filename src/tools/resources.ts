@@ -15,7 +15,7 @@ export function registerResourceTools(
     {
       title: "List text-to-speech voices",
       description:
-        "List available text-to-speech voices for narration, text_to_speech, and workflows.",
+        "Return a page of narration voices with voiceId, display name, language, accent, description, deprecation status, and supportsDirectToolExecution. Use a voice with supportsDirectToolExecution true for text_to_speech; nextCursor fetches more voices.",
       inputSchema: listTtsVoicesInputSchema,
       outputSchema: listTtsVoicesOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -27,7 +27,7 @@ export function registerResourceTools(
     "list_languages",
     {
       title: "List languages",
-      description: "List supported languages for narration and captions.",
+      description: "Return supported narration and caption languages as languageCode and English name pairs. Use these codes when selecting workflow output languages.",
       inputSchema: listLanguagesInputSchema,
       outputSchema: listLanguagesOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,

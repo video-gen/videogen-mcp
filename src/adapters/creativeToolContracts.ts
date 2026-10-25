@@ -35,7 +35,7 @@ const videoQualitySchema = z
 const storyboardImageQualitySchema = z
   .enum(["HIGH", "MAX"])
   .describe(
-    "Image generation quality for scene opening frames. Optional; defaults to HIGH. Does not change video generation quality.",
+    "Image generation quality for scene opening frames. Omit to use HIGH. Does not change video generation quality.",
   );
 
 const styleSchema = z.string().min(1).optional().describe(MCP_AI_STYLE_FIELD_DESCRIPTION);
@@ -109,10 +109,13 @@ export const slideshowToVideoInputSchema = z.object({
   autoExport: autoExportSchema,
 });
 
+const optionalEntityIdListSchema = ({ description }: { description: string }) =>
+  z.array(z.string()).optional().describe(description);
+
 const storyboardSceneSchema = z.object({
-  prompt: z.string().min(1).describe("Required visual description for this scene."),
-  voiceoverScript: z.string().optional().describe("Optional words spoken during this scene."),
-  title: z.string().optional().describe("Optional scene title."),
+  prompt: z.string().min(1).describe("Visual description of what should appear in this scene."),
+  voiceoverScript: z.string().optional().describe("Words spoken during this scene."),
+  title: z.string().optional().describe("Scene label used to identify the shot."),
   durationSeconds: z
     .number()
     .int()
@@ -120,14 +123,39 @@ const storyboardSceneSchema = z.object({
     .max(15)
     .nullable()
     .optional()
-    .describe("Optional scene duration in whole seconds (1-15)."),
+    .describe("Requested scene playback duration in seconds."),
+  actorEntityIds: optionalEntityIdListSchema({
+    description:
+      "Ids of ACTOR entities (vg_enti_...) to feature in this scene. Each entity's reference images are used so the same characters appear. Create the entity and add_entity_reference first.",
+  }),
+  productEntityIds: optionalEntityIdListSchema({
+    description:
+      "Ids of PRODUCT entities (vg_enti_...) whose reference images should appear in this scene. Create the entity and add_entity_reference first.",
+  }),
+  visualStyleEntityId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Id of a VISUAL_STYLE entity (vg_enti_...) whose reference images guide this scene's look.",
+    ),
 });
 
 export const storyboardToVideoInputSchema = z.object({
   scenes: z
     .array(storyboardSceneSchema)
     .min(1)
-    .describe("Ordered scenes. Every scene requires a visual `prompt`."),
+    .describe(
+      "Ordered scenes. Every scene requires a visual prompt. Put productEntityIds, actorEntityIds, or visualStyleEntityId on each scene that should use that entity's reference images.",
+    ),
+  actorEntityIds: optionalEntityIdListSchema({
+    description:
+      "ACTOR entity ids (vg_enti_...) to keep attached to the project. Also set actorEntityIds on each scene that should show that actor.",
+  }),
+  productEntityIds: optionalEntityIdListSchema({
+    description:
+      "PRODUCT entity ids (vg_enti_...) to keep attached to the project. Also set productEntityIds on each scene that should show that product.",
+  }),
   style: styleSchema,
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: storyboardImageQualitySchema.optional(),
@@ -140,12 +168,66 @@ export const promptToVideoClipInputSchema = z.object({
     .array(z.string())
     .max(4)
     .optional()
-    .describe("Optional reference image file ids."),
-  durationSeconds: z.number().int().min(1).max(30).optional(),
+    .describe("Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files."),
+  durationSeconds: z.number().int().min(1).max(30).optional().describe("Requested clip playback duration in seconds."),
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: videoQualitySchema.optional(),
   autoExport: autoExportSchema,
 });
+
+export const videoToVideoInputSchema = z
+  .object({
+    videoFileId: z
+      .string()
+      .optional()
+      .describe("Uploaded video file id to restyle. Provide this or videoUrl, not both."),
+    videoUrl: z
+      .string()
+      .max(2048)
+      .optional()
+      .describe(
+        "Public http(s) link to a video page or video file to restyle. The run imports it, so no upload is needed. Provide this or videoFileId, not both.",
+      ),
+    prompt: z.string().min(1).describe("How the restyled video should look."),
+    trimStartSeconds: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("Second of the video where the restyled part starts. Defaults to 0."),
+    trimEndSeconds: z
+      .number()
+      .min(0)
+      .optional()
+      .describe(
+        "Second of the video where the restyled part ends. The restyled part must be 2 to 120 seconds long. Defaults to the start plus 120 seconds, capped at the end of the video.",
+      ),
+    imageFileIds: z
+      .array(z.string())
+      .max(10)
+      .optional()
+      .describe("Optional reference image file ids that guide the look."),
+    aspectRatio: creativeAspectRatioSchema
+      .optional()
+      .describe(
+        "Output aspect ratio as width:height units. With videoFileId, defaults to the closest match to the source. With videoUrl, defaults to 16:9, so pass it for vertical or square videos.",
+      ),
+    quality: z
+      .enum(["LOW", "STANDARD", "HIGH", "MAX"])
+      .optional()
+      .describe(
+        "Restyle quality (LOW, STANDARD, HIGH, or MAX). Higher tiers cost more and follow the source more faithfully. Defaults to HIGH.",
+      ),
+    audio: z
+      .enum(["KEEP_ORIGINAL", "GENERATE"])
+      .optional()
+      .describe(
+        "KEEP_ORIGINAL keeps the source audio under the restyled picture. GENERATE uses newly generated audio. Defaults to KEEP_ORIGINAL.",
+      ),
+    autoExport: autoExportSchema,
+  })
+  .refine((input) => (input.videoFileId == null) !== (input.videoUrl == null), {
+    message: "Provide exactly one of videoFileId or videoUrl.",
+  });
 
 export const generateImageInputSchema = z.object({
   prompt: z.string().min(1).describe("Description of the image to generate."),
@@ -153,12 +235,12 @@ export const generateImageInputSchema = z.object({
     .array(z.string())
     .max(4)
     .optional()
-    .describe("Optional reference image file ids."),
+    .describe("Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files."),
   entityIds: z
     .array(z.string())
     .optional()
     .describe(
-      "Optional actor, product, or visual-style entity ids (vg_enti_...) used as identity/reference.",
+      "Actor, product, or visual-style references for consistent identity and appearance. Use entityId values from list_entities or create_entity, with reference files attached.",
     ),
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: imageQualitySchema.optional(),
@@ -170,9 +252,9 @@ export const generateVideoClipInputSchema = z
     startFrameFileId: z
       .string()
       .optional()
-      .describe("Optional opening-frame still file id. Used as the first frame of the clip."),
-    imageFileIds: z.array(z.string()).optional().describe("Optional reference image file ids."),
-    videoFileIds: z.array(z.string()).optional().describe("Optional reference video file ids."),
+      .describe("Optional opening-frame still file id. Used as the first frame of the clip. Combining this with videoFileIds requires quality HIGH or MAX."),
+    imageFileIds: z.array(z.string()).optional().describe("Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files. Combining these with videoFileIds requires quality HIGH or MAX."),
+    videoFileIds: z.array(z.string()).optional().describe("Reference videos for motion or style guidance, without guaranteeing exact reproduction. Combining these with startFrameFileId or imageFileIds requires quality HIGH or MAX."),
     audioFileIds: z
       .array(z.string())
       .optional()
@@ -208,7 +290,7 @@ export const generateVideoClipInputSchema = z
       .max(30)
       .nullable()
       .optional()
-      .describe("Optional clip length in whole seconds (1 to 30). Omit or pass null for Auto."),
+      .describe("Requested clip playback duration in seconds. Omit or pass null for automatic timing."),
     aspectRatio: creativeAspectRatioSchema.optional(),
     quality: videoQualitySchema.optional(),
   })
@@ -224,17 +306,17 @@ export const generateVideoClipInputSchema = z
   );
 
 export const textToSpeechInputSchema = z.object({
-  text: z.string().min(1).describe("Text to speak."),
+  text: z.string().min(1).describe("Words to synthesize as spoken audio."),
   voiceId: z
     .string()
     .describe("Catalog display name (e.g. Matilda) or voice id from list_tts_voices."),
-  language: z.string().nullable().optional().describe("ISO-639-1 pronunciation language hint."),
-  speed: z.number().min(0.5).max(2).optional().describe("Speech-rate multiplier."),
+  language: z.string().nullable().optional().describe("ISO-639-1 pronunciation language hint, such as en or es. Omit or pass null to leave pronunciation language selection automatic."),
+  speed: z.number().min(0.5).max(2).optional().describe("Speech-rate multiplier relative to the voice's normal speed (1)."),
 });
 
 export const generateSoundEffectInputSchema = z.object({
   prompt: z.string().min(1).describe("Description of the sound effect."),
-  durationSeconds: z.number().min(1).max(30).nullable().optional(),
+  durationSeconds: z.number().min(1).max(30).nullable().optional().describe("Requested sound-effect playback duration in seconds."),
 });
 
 export const generateMusicInputSchema = z.object({
@@ -249,12 +331,12 @@ const motionGraphicSubToolModeSchema = z
 
 export const generateMotionGraphicInputSchema = z.object({
   prompt: z.string().min(1).describe("Description of the animated motion graphic."),
-  fileIds: z.array(z.string()).optional().describe("Optional reference media file ids."),
+  fileIds: z.array(z.string()).optional().describe("Media to display or animate in the motion graphic. Use fileId values from upload_file, get_file, or list_files."),
   entityIds: z
     .array(z.string())
     .optional()
-    .describe("Optional actor, product, or visual-style entity ids (vg_enti_...)."),
-  durationSeconds: z.number().int().min(1).max(300).nullable().optional(),
+    .describe("Actor, product, or visual-style references. Use entityId values from list_entities or create_entity, with reference files attached."),
+  durationSeconds: z.number().int().min(1).max(300).nullable().optional().describe("Requested motion-graphic playback duration in seconds."),
   aspectRatio: creativeAspectRatioSchema.optional(),
   transparentBackground: z
     .boolean()
@@ -264,10 +346,10 @@ export const generateMotionGraphicInputSchema = z.object({
     ),
   subToolModes: z
     .object({
-      generateImages: motionGraphicSubToolModeSchema.optional(),
-      generateVideoClips: motionGraphicSubToolModeSchema.optional(),
-      generateVoiceover: motionGraphicSubToolModeSchema.optional(),
-      searchStockMedia: motionGraphicSubToolModeSchema.optional(),
+      generateImages: motionGraphicSubToolModeSchema.optional().describe("Control image generation within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
+      generateVideoClips: motionGraphicSubToolModeSchema.optional().describe("Control video-clip generation within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
+      generateVoiceover: motionGraphicSubToolModeSchema.optional().describe("Control voiceover synthesis within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
+      searchStockMedia: motionGraphicSubToolModeSchema.optional().describe("Control stock-media search within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
     })
     .optional()
     .describe(
@@ -282,11 +364,11 @@ export const generateAvatarInputSchema = z.object({
       "Id of a built-in stock actor or an ACTOR entity (vg_enti_...) with an image reference.",
     ),
   avatarQuality: avatarQualitySchema.optional(),
-  audioFileId: z.string().describe("Audio file id for the avatar to lip-sync."),
+  audioFileId: z.string().describe("Speech recording for the actor to lip-sync. Use fileId from an audio upload, list_files, or a succeeded text_to_speech result."),
 });
 
-const imageFileIdSchema = z.string().describe("Source image file id.");
-const videoFileIdSchema = z.string().describe("Source video file id.");
+const imageFileIdSchema = z.string().describe("Image to transform. Use fileId from upload_file, list_files, or a succeeded image-generation result.");
+const videoFileIdSchema = z.string().describe("Video to transform. Use fileId from upload_file, list_files, or a succeeded video-generation result.");
 
 export const vectorizeImageInputSchema = z.object({ imageFileId: imageFileIdSchema });
 export const removeImageBackgroundInputSchema = z.object({
@@ -300,11 +382,11 @@ export const upscaleVideoInputSchema = z.object({ videoFileId: videoFileIdSchema
 export const image3dEffectInputSchema = z.object({ imageFileId: imageFileIdSchema });
 
 export const exportProjectInputSchema = z.object({
-  projectId: z.string().describe("Project id to export."),
+  projectId: z.string().describe("Editable project to render. Use projectId from a workflow result, list_projects, or get_project."),
   quality: z
     .enum(["STANDARD", "HIGH", "FULL_HIGH", "ULTRA_HIGH"])
     .optional()
-    .describe("Export quality. Omit for the default."),
+    .describe("MP4 resolution tier by shortest edge: STANDARD is 720p, HIGH and FULL_HIGH are 1080p, and ULTRA_HIGH is 2160p. Omit for FULL_HIGH."),
 });
 
 const remixEditSchema = z
@@ -323,14 +405,14 @@ const remixEditInputSchema = z.preprocess((value) => {
 }, remixEditSchema);
 
 export const remixProjectInputSchema = z.object({
-  projectId: z.string().describe("Project id to edit."),
+  projectId: z.string().describe("Editable project to remix. Use projectId from a workflow result, list_projects, or get_project."),
   edits: z
     .array(remixEditInputSchema)
     .min(1)
     .describe(
       "Curated edits to apply in order. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still and is expensive. Use ZOOM for cheap Ken Burns camera motion.",
     ),
-  saveAsNewProject: z.boolean().optional().describe("Apply edits to a copy of the project."),
+  saveAsNewProject: z.boolean().optional().describe("When true, duplicate the project and apply edits to the copy. When omitted, edit the original project in place."),
 });
 
 export type CreativeAspectRatio = z.infer<typeof creativeAspectRatioSchema>;

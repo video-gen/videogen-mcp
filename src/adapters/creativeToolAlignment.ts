@@ -14,6 +14,7 @@ import type {
   StoryboardToVideoRequest,
   TextToSpeechRequest,
   VideoAssetRequest,
+  VideoToVideoRequest,
   VoiceoverToVideoRequest,
 } from "@videogen/sdk";
 import type { z } from "zod";
@@ -37,6 +38,7 @@ import {
   upscaleImageInputSchema,
   upscaleVideoInputSchema,
   vectorizeImageInputSchema,
+  videoToVideoInputSchema,
   voiceoverToVideoInputSchema,
   type RemixEdit,
 } from "./creativeToolContracts";
@@ -103,6 +105,9 @@ assertTrue<
 >(true);
 assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof promptToVideoClipInputSchema>, PromptToVideoClipRequest>
+>(true);
+assertTrue<
+  AssertMcpKeysSubsetOfSdk<z.output<typeof videoToVideoInputSchema>, VideoToVideoRequest>
 >(true);
 assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof generateImageInputSchema>, GenerateImageRequest>
@@ -201,6 +206,12 @@ export const CREATIVE_TOOL_OPENAPI_CONTRACTS: readonly CreativeToolOpenApiContra
   {
     toolName: "prompt_to_video_clip",
     openApiSchemaName: "PromptToVideoClipRequest",
+    fieldAliases: {},
+    mcpOnlyFields: [],
+  },
+  {
+    toolName: "video_to_video",
+    openApiSchemaName: "VideoToVideoRequest",
     fieldAliases: {},
     mcpOnlyFields: [],
   },

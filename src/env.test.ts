@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import {
+  getPublicOriginHostname,
   getVideogenEnvironmentForBaseUrl,
   readHttpServerConfig,
 } from "./env";
@@ -10,8 +11,11 @@ let savedSupabaseProjectUrl: string | undefined;
 let savedBaseUrl: string | undefined;
 let savedVideogenEnv: string | undefined;
 let savedOpenaiAppsChallengeToken: string | undefined;
+let savedTrustedProxyHops: string | undefined;
 
 beforeEach(() => {
+  savedTrustedProxyHops = process.env.VIDEOGEN_MCP_TRUSTED_PROXY_HOPS;
+  delete process.env.VIDEOGEN_MCP_TRUSTED_PROXY_HOPS;
   savedIssuer = process.env.VIDEOGEN_OAUTH_ISSUER;
   savedSupabaseProjectUrl = process.env.VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL;
   savedBaseUrl = process.env.VIDEOGEN_BASE_URL;
@@ -30,6 +34,7 @@ afterEach(() => {
   restoreEnv("VIDEOGEN_BASE_URL", savedBaseUrl);
   restoreEnv("VIDEOGEN_ENV", savedVideogenEnv);
   restoreEnv("VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN", savedOpenaiAppsChallengeToken);
+  restoreEnv("VIDEOGEN_MCP_TRUSTED_PROXY_HOPS", savedTrustedProxyHops);
 });
 
 function restoreEnv(key: string, value: string | undefined): void {
@@ -129,4 +134,37 @@ void test("openaiAppsChallengeToken uses the env var and strips surrounding whit
   process.env.VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN = "  challenge-token-value  ";
 
   assert.equal(readHttpServerConfig().openaiAppsChallengeToken, "challenge-token-value");
+});
+
+void test("getPublicOriginHostname reads the deployment host and ignores a non-URL override", () => {
+  assert.equal(getPublicOriginHostname("https://dev.mcp.videogen.io"), "dev.mcp.videogen.io");
+  assert.equal(getPublicOriginHostname("https://dev.mcp.videogen.io/"), "dev.mcp.videogen.io");
+  assert.equal(getPublicOriginHostname(null), null);
+  assert.equal(getPublicOriginHostname("not a url"), null);
+});
+
+void test("forwarded-for trust is off on LOCAL", () => {
+  const { trustedProxyHopCount, trustCloudflareEdgeHop } = readHttpServerConfig();
+  assert.equal(trustedProxyHopCount, 0);
+  assert.equal(trustCloudflareEdgeHop, false);
+});
+
+void test("hosted environments trust the Cloud Run hop and step over a Cloudflare edge", () => {
+  for (const environment of ["DEV", "PRERELEASE", "PROD"]) {
+    process.env.VIDEOGEN_ENV = environment;
+    const { trustedProxyHopCount, trustCloudflareEdgeHop } = readHttpServerConfig();
+    assert.equal(trustedProxyHopCount, 1);
+    assert.equal(trustCloudflareEdgeHop, true);
+  }
+});
+
+void test("a valid hop override disables the Cloudflare step and an invalid one is ignored", () => {
+  process.env.VIDEOGEN_ENV = "PROD";
+  process.env.VIDEOGEN_MCP_TRUSTED_PROXY_HOPS = "2";
+  const overridden = readHttpServerConfig();
+  assert.equal(overridden.trustedProxyHopCount, 2);
+  assert.equal(overridden.trustCloudflareEdgeHop, false);
+
+  process.env.VIDEOGEN_MCP_TRUSTED_PROXY_HOPS = "-1";
+  assert.equal(readHttpServerConfig().trustedProxyHopCount, 1);
 });

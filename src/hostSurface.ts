@@ -119,35 +119,25 @@ export const getServerInstructionsForHostSurface = ({
 }: {
   hostSurface: McpHostSurface;
 }): string => {
-  const shared = `VideoGen MCP executes the VideoGen API (workflows, media tools, remix, export, entities, files).
+  const shared = `Before setup or capability answers, call get_getting_started_guidance. Before generation, call get_workflows_guidance or get_tools_vs_workflows_guidance; before polling, call get_async_tasks_guidance. These mirror guidance:// resources and contain workflow choices, examples, style prompts, entity references, and complete operating guidance.
 
-Prefer workflows for full narrated multi-scene video; prefer generate_* media tools for a single asset. VideoGen routes generative tools to a suitable model automatically — do not ask the user to pick an upstream model vendor.
+VideoGen creates editable videos and standalone media. Prefer workflows for full videos and media tools for single assets. If no workflow was named, ask with brief pros/cons. Prefer script_to_video for longer narrated videos; keep storyboards to 3 scenes unless explicitly asked for more. Use full style prompts from get_workflows_guidance.
 
-When the user asks what VideoGen can do, or you need starter prompts: lead with finished-video workflows, not a catalog of generate_* tools. Give two examples such as "Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover" and "Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end". Do not use a motion graphic, countdown, lower-third, or other single-asset tool as a first example. Mention standalone media tools only if they ask for one image, clip, overlay, or transform.
+Generation spends team credits and takes time. Set honest expectations: images 15–60 seconds, clips 1–3 minutes, motion graphics 2–5 minutes, full workflows several minutes. Hosted calls may return running snapshots after 90 seconds; continue with get_workflow_run, get_tool_execution, or get_project_export. Never restart a healthy run to poll it.
 
-For ~1 minute+ narrated / informational videos from text, prefer script_to_video. Use storyboard_to_video only for short shot-directed spots, and never more than 3 scenes unless the user explicitly asks for more (storyboard is much more credit-heavy). If the user has not named a workflow, ask with short pros/cons before starting.
+Preserve the user's required inputs. If a request cannot use them together, explain the constraint and agree on a supported approach before dropping references or increasing paid quality. Reference-guided generation does not guarantee exact reproduction.
 
-For consistent actors/products/styles: upload an image, create_entity, add_entity_reference (isDefault: true), then pass the vg_enti_... id (e.g. actorEntityId). Prefer MCP entity tools over opening the app Entities page unless the user asks for the UI.
+Each workflow start creates a new project. Keep workflowRunId, projectId, and projectUrl together; after a retry use only the new run's ids and URL. Share downloadUrl after success. For entity references, attach uploaded files with add_entity_reference and pass entity ids on the appropriate workflow and scene fields.
 
-Before non-trivial setup, "what can VideoGen do" answers, async polling, workflow/remix/export, or tools-vs-workflows decisions, call the matching guidance tool (get_getting_started_guidance, get_async_tasks_guidance, get_workflows_guidance, or get_tools_vs_workflows_guidance). Those tools mirror the guidance:// MCP resources for clients that do not read resources.
-
-Generation is not instant. Tell the user a realistic wait before or as you start, then keep polling calmly — a healthy in-progress job is expected, not a stall. Typical wall times: images about 15–60 seconds; video clips about 1–3 minutes (HIGH/MAX can be longer); motion graphics about 2–5 minutes because they write animation code and then render (complex prompts can take longer); avatars and music often a few minutes; full workflows several minutes. Do not imply a clip will be ready in a few seconds.
-
-On the hosted server, long operations may return a still-running snapshot within about 90 seconds; continue with get_workflow_run, get_tool_execution, or get_project_export.
-
-Every workflow start call creates a new project. The MCP returns its matching \`workflowRunId\`, \`projectId\`, and \`projectUrl\` together. Treat those three values as an inseparable tuple. If a workflow fails and you retry it, discard the failed attempt's ids, poll only the new \`workflowRunId\`, and share only the \`projectUrl\` returned for the succeeded retry. Never combine progress from a retry with a project URL from an earlier attempt, and never present a failed attempt's project as the completed result.`;
+MCP uses AUTO account-default branding. Never invent watermarkMode or endScreenMode inputs.`;
 
   if (hostSurface === "CHATGPT_APP") {
     return `${shared}
 
-Credits / plan gates: tell the user to open https://app.videogen.io and manage their VideoGen account. Never name pricing or plan-change flows, and never open billing deep links.
-
-Watermarks: MCP always uses account-default branding (AUTO). Generated images, clips, and exported videos may include VideoGen branding. If the user wants branding removed, tell them to open https://app.videogen.io and manage their VideoGen account. Do not pass watermarkMode or endScreenMode.`;
+For credits, plan access, or branding removal, tell the user to open https://app.videogen.io and manage their VideoGen account. Never name pricing or plan-change flows or open billing deep links.`;
   }
 
   return `${shared}
 
-Credits / plan gates: use get_app_deep_link (OPEN_UPGRADE, OPEN_PURCHASE_CREDITS, OPEN_ENABLE_TOP_UPS) and walk the user into that VideoGen app flow.
-
-Watermarks: MCP always uses AUTO branding and does not expose watermarkMode or endScreenMode. Free-plan output includes the VideoGen watermark (and a short end screen on export). Removing watermarks requires VideoGen Pro; use get_app_deep_link OPEN_UPGRADE. After they upgrade, keep using MCP as-is.`;
+For credits or plan gates, use get_app_deep_link with OPEN_UPGRADE, OPEN_PURCHASE_CREDITS, or OPEN_ENABLE_TOP_UPS. Removing Free-plan branding requires VideoGen Pro (OPEN_UPGRADE).`;
 };

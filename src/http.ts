@@ -8,6 +8,7 @@ import { applyServerProxyKeepAliveTimeouts } from "./applyServerProxyKeepAliveTi
 import { OAUTH_SCOPES, SERVER_NAME, SERVER_VERSION, buildMcpServer } from "./buildServer";
 import { createVideoGenClientFromToken } from "./client";
 import {
+  getPublicOriginHostname,
   getVideogenEnvironment,
   readHttpServerConfig,
   type VideogenEnvironment,
@@ -82,6 +83,10 @@ function consumeMetadataRateLimit(req: IncomingMessage, res: ServerResponse): bo
   const metadataIp = getClientIp({
     forwardedFor: req.headers["x-forwarded-for"],
     socketAddress: req.socket.remoteAddress,
+    trustedProxyHopCount: config.trustedProxyHopCount,
+    trustCloudflareEdgeHop: config.trustCloudflareEdgeHop,
+    host: req.headers.host,
+    cloudflareEdgeHost: getPublicOriginHostname(config.publicOrigin),
   });
 
   if (
@@ -259,6 +264,10 @@ async function handleMcpPost(
   const clientIp = getClientIp({
     forwardedFor: req.headers["x-forwarded-for"],
     socketAddress: req.socket.remoteAddress,
+    trustedProxyHopCount: config.trustedProxyHopCount,
+    trustCloudflareEdgeHop: config.trustCloudflareEdgeHop,
+    host: req.headers.host,
+    cloudflareEdgeHost: getPublicOriginHostname(config.publicOrigin),
   });
 
   if (token == null) {

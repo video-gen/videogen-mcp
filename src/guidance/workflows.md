@@ -21,6 +21,7 @@ Workflow tools default to `autoExport: true`. Wait until status is **`succeeded`
 | A PDF or PowerPoint | `slideshow_to_video` | `fileId` (uploaded deck) |
 | Short, tightly directed **shot list** (user wants frame-by-frame control) | `storyboard_to_video` | `scenes` (visual prompt + optional spoken words per scene) |
 | One short clip idea (up to ~30s) as a project | `prompt_to_video_clip` | `prompt`, optional reference image file ids |
+| Restyle an **existing video** (a new look, same timing) | `video_to_video` | `videoFileId` (uploaded video) or `videoUrl` (public link), `prompt` |
 
 #### Script vs storyboard (credits and length)
 
@@ -38,9 +39,12 @@ Hard rules for `storyboard_to_video`:
 3. For “about one minute,” “explainer,” “informational,” “news,” or similar without a shot list → prefer **`script_to_video`**, or ask script vs storyboard with the table above.
 4. Do not use storyboard as a fallback when another workflow’s optional fields fail validation. Fix the payload or switch intentionally after asking.
 
-Creative MCP fields use `style` (visual look) and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }` for 16:9). Write `style` as a full, strict paragraph like the app defaults on the `style` field (medium, texture, palette, then composition). Do not pass a short label such as "watercolor". Image models pack the frame with text, charts, diagrams, and extra objects unless the style forbids that. Every style must keep the picture simple: one uncluttered subject in the middle half of the frame, empty margins, and no on-image text or diagrams unless the user asked for one specific word or number. Omit `style` for the Realistic default (`Photorealistic photograph, natural lighting`).
+Creative MCP fields use `style` (visual look) and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }` for 16:9). Copy `style` from the default table below. Do not invent a shorter version.
 
-Upload required files first (`open_uploader`, `upload_file`, or `create_file_upload`). See `get_getting_started_guidance`.
+<!-- mcp-ai-style-examples -->
+<!-- /mcp-ai-style-examples -->
+
+Upload required files first. On ChatGPT, call `open_uploader` and pass any files already attached in the chat. A filename is not an upload. Other clients use `upload_file` or `create_file_upload`. See `get_getting_started_guidance`.
 
 Wait until the workflow run is **`succeeded`**. When `autoExport` is on (the default), the result includes **`downloadUrl`**. Keep **`projectId`** for later remix or a second export.
 
@@ -99,11 +103,19 @@ Upload a PDF or PowerPoint, then pass `fileId`. Builds a narrated walkthrough of
 
 Pass ordered `scenes`. Each scene needs a visual prompt; spoken words are optional. Use only when the user wants **frame-by-frame** control of what appears on screen (or explicitly asks for storyboard).
 
+To show a saved product, actor, or visual style, pass that entity's `vg_enti_...` id on every scene that should use its reference images: `productEntityIds`, `actorEntityIds`, or `visualStyleEntityId`. Also pass request-level `productEntityIds` or `actorEntityIds` so the entity stays on the project. Create the entity and call `add_entity_reference` first. A prompt by itself leaves the reference images off the shot.
+
 **Credit cost scales with scene count.** Keep storyboards to **3 scenes or fewer** unless the user specifically requests more. For longer informational scripts, use `script_to_video` instead of expanding a storyboard.
 
 ### Prompt to video clip (`prompt_to_video_clip`)
 
 One short AI clip inside an editable project (duration up to about 30 seconds; clamped to the selected quality's supported range). For a **standalone** clip with no project pipeline, prefer the media tool `generate_video_clip` instead (see tools-vs-workflows guidance).
+
+### Video to video (`video_to_video`)
+
+Restyles an existing video from one `prompt` (for example "hand-made claymation with soft studio lighting") and keeps its length, timing, and cuts. Pass exactly one source: `videoFileId` for an uploaded video, or `videoUrl` for a public link to a video page or video file. The run imports a link itself, so do not upload or import it first. Private, login-only, and DRM-protected links cannot be imported.
+
+Up to 120 seconds is restyled per run. Without `trimStartSeconds` / `trimEndSeconds`, the first 120 seconds is used. With `videoUrl`, pass `aspectRatio` for vertical or square videos (it defaults to 16:9 because the link's shape is unknown until the import). `audio: "KEEP_ORIGINAL"` (the default) keeps the source soundtrack. `quality` accepts `LOW`, `STANDARD`, `HIGH` (the default), or `MAX`. Credit use grows with the restyled length and with higher quality tiers.
 
 ---
 
@@ -131,5 +143,5 @@ Recommended cheap polish: `CAPTIONS` + `ZOOM` (or `TRANSITIONS` + `ZOOM`). Only 
 1. **Skipping the MP4.** A succeeded workflow with default `autoExport` includes `downloadUrl`. Give that URL to the user. Only skip auto-export when you need `remix_project` first, then call `export_project`.
 2. **Remix or export before workflow `succeeded`.**
 3. **Using a media tool when the user asked for a full video.** Prefer a workflow.
-4. **Forgetting uploads** before voiceover / slideshow / logo-related flows.
+4. **Forgetting uploads** before voiceover / slideshow / logo-related flows. (`video_to_video` takes a public `videoUrl` directly.)
 5. **Defaulting to a long `storyboard_to_video`** for a ~1 minute explainer. Prefer `script_to_video`, or ask the user with pros/cons first. Never start storyboard with more than 3 scenes unless they explicitly asked.

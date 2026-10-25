@@ -17,13 +17,15 @@ import {
 } from "../outputSchemas";
 import {
   DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
+  IDEMPOTENT_DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
   READ_ONLY_TOOL_ANNOTATIONS,
   WRITE_PRIVATE_TOOL_ANNOTATIONS,
 } from "../toolAnnotations";
 
 /**
- * Entity CRUD for consistent ACTOR / PRODUCT / VISUAL_STYLE / SLIDESHOW_THEME
- * references used by workflows and `generate_avatar`. Typical create flow:
+ * Entity CRUD for consistent ACTOR / PRODUCT / VISUAL_STYLE / SLIDESHOW_THEME /
+ * BRAND / LOCATION / PROP references used by workflows and `generate_avatar`.
+ * Typical create flow:
  *   1. Upload an image (`upload_file` / `create_file_upload` / `open_uploader`)
  *   2. `create_entity` with entityType + name
  *   3. `add_entity_reference` with the uploaded fileId (isDefault: true)
@@ -39,13 +41,12 @@ export function registerEntityTools(
     {
       title: "List entities",
       description:
-        "List built-in actors, products, visual styles, and slideshow themes plus team entities. Built-in rows have isBuiltIn true and cannot be updated or archived. Filter with entityType when you only need one kind.",
+        "List built-in actors, products, visual styles, and slideshow themes plus team entities (including brands, locations, and props). Built-in rows have isBuiltIn true and cannot be updated or archived. Filter with entityType when you only need one kind.",
       inputSchema: listEntitiesInputSchema,
       outputSchema: listEntitiesOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
-    async (args) =>
-      await respondSdk(() => getClient().entities.listEntities(dropUndefined(args))),
+    async (args) => await respondSdk(() => getClient().entities.listEntities(dropUndefined(args))),
   );
 
   server.registerTool(
@@ -53,13 +54,12 @@ export function registerEntityTools(
     {
       title: "Create entity",
       description:
-        "Create an ACTOR (character), PRODUCT (product/object), VISUAL_STYLE, or SLIDESHOW_THEME entity. After create, attach at least one reference with add_entity_reference (upload the file first). Slideshow themes may attach an image or a PDF / PowerPoint. Use the returned entityId as actorEntityId on generate_avatar / script_to_video, a product/style reference in storyboard scenes, or slideshowThemeEntityId on slideshow_to_video.",
+        "Create an ACTOR (character), PRODUCT (something the user sells or promotes), VISUAL_STYLE, SLIDESHOW_THEME, BRAND, LOCATION (place or set), or PROP (background object that is not for sale) entity. Anything the user sells is a PRODUCT, never a PROP. A BRAND accepts brandConfig with fonts, colors, and writingStyle. Returns the new entity record with entityId and references. After create, attach references with add_entity_reference (upload the file first). Slideshow themes may attach an image or a PDF / PowerPoint. Use the returned entityId as actorEntityId on generate_avatar / script_to_video / slideshow_to_video, as productEntityIds or actorEntityIds on storyboard_to_video (request and each scene that should show it), as visualStyleEntityId on each storyboard scene, or as slideshowThemeEntityId on slideshow_to_video.",
       inputSchema: createEntityInputSchema,
       outputSchema: entityOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
     },
-    async (args) =>
-      await respondSdk(() => getClient().entities.createEntity(dropUndefined(args))),
+    async (args) => await respondSdk(() => getClient().entities.createEntity(dropUndefined(args))),
   );
 
   server.registerTool(
@@ -80,13 +80,12 @@ export function registerEntityTools(
     {
       title: "Update entity",
       description:
-        "Update an entity's display name and/or description. Built-in entities cannot be updated.",
+        "Overwrite supplied display name, description, or complete brandConfig fields on an existing team entity. Omitted fields stay unchanged. Returns the updated entity. Built-in entities cannot be updated.",
       inputSchema: updateEntityInputSchema,
       outputSchema: entityOutputSchema,
-      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
+      annotations: DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
     },
-    async (args) =>
-      await respondSdk(() => getClient().entities.updateEntity(dropUndefined(args))),
+    async (args) => await respondSdk(() => getClient().entities.updateEntity(dropUndefined(args))),
   );
 
   server.registerTool(
@@ -94,10 +93,10 @@ export function registerEntityTools(
     {
       title: "Archive entity",
       description:
-        "Archive an entity so it no longer appears in lists or pickers. Built-in entities cannot be archived.",
+        "Soft-archive a team entity so it no longer appears in lists or pickers. Returns entityId and archived. This tool has no restore operation; retrying an archived entity can fail because it is no longer active. Built-in entities cannot be archived.",
       inputSchema: archiveEntityInputSchema,
       outputSchema: entityArchiveOutputSchema,
-      annotations: DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
+      annotations: IDEMPOTENT_DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) => await respondSdk(() => getClient().entities.archiveEntity(args)),
   );
@@ -107,7 +106,7 @@ export function registerEntityTools(
     {
       title: "Add entity reference",
       description:
-        "Attach an uploaded file (vg_file_...) as a reference on an entity. Images work for every entity type. Slideshow themes may also attach a PDF or PowerPoint. Built-in entities cannot have references added. For new PRODUCT/ACTOR entities, call this right after create_entity with isDefault: true so the entity has a usable thumbnail and generation reference.",
+        "Attach an uploaded file (vg_file_...) as a reference on an entity. Images work for every entity type. Slideshow themes may also attach a PDF or PowerPoint. For a BRAND, set role BRAND_LOGO for its overlay logo or BRAND_STYLE_GUIDE for its visual generation reference. Built-in entities cannot have references added. For new PRODUCT/ACTOR entities, call this right after create_entity with isDefault: true so the entity has a usable thumbnail and generation reference.",
       inputSchema: addEntityReferenceInputSchema,
       outputSchema: entityOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -121,10 +120,10 @@ export function registerEntityTools(
     {
       title: "Remove entity reference",
       description:
-        "Detach a reference image from an entity by file id. Built-in entities cannot have references removed.",
+        "Soft-archive a reference attachment on a team entity without deleting the source file. If it was the default reference, another reference is promoted when available. Returns the entity with its remaining references. Retrying a removed attachment can fail because it is no longer active. Built-in entities cannot have references removed.",
       inputSchema: removeEntityReferenceInputSchema,
       outputSchema: entityOutputSchema,
-      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
+      annotations: IDEMPOTENT_DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) => await respondSdk(() => getClient().entities.removeEntityReference(args)),
   );

@@ -5,8 +5,10 @@ import {
   toScriptToVideoRequest,
   toSlideshowToVideoRequest,
   toStoryboardToVideoRequest,
+  toVideoToVideoRequest,
   toVoiceoverToVideoRequest,
 } from "./workflowAdapters";
+import { videoToVideoInputSchema } from "./creativeToolContracts";
 
 const mcpVisualStyle = {
   type: "AI_IMAGE" as const,
@@ -16,7 +18,6 @@ const mcpVisualStyle = {
 
 const mcpWorkflowDefaults = {
   isOutputTemporary: false,
-  hideFromUi: false,
   autoExport: true,
   exportOptions: {
     watermarkMode: "AUTO",
@@ -101,8 +102,13 @@ describe("workflow MCP adapters", () => {
             durationSeconds: null,
             prompt: "Product reveal on a marble vanity.",
             voiceoverScript: "Meet your new everyday lip tint.",
+            productEntityIds: ["vg_enti_product"],
+            actorEntityIds: ["vg_enti_actor"],
+            visualStyleEntityId: "vg_enti_style",
           },
         ],
+        productEntityIds: ["vg_enti_product"],
+        actorEntityIds: ["vg_enti_actor"],
         style: "premium beauty campaign",
         quality: "HIGH",
       }),
@@ -111,12 +117,74 @@ describe("workflow MCP adapters", () => {
           {
             prompt: "Product reveal on a marble vanity.",
             voiceoverScript: "Meet your new everyday lip tint.",
+            productEntityIds: ["vg_enti_product"],
+            actorEntityIds: ["vg_enti_actor"],
+            visualStyleEntityId: "vg_enti_style",
           },
         ],
+        productEntityIds: ["vg_enti_product"],
+        actorEntityIds: ["vg_enti_actor"],
         defaultGeneration: { aiStyle: "premium beauty campaign" },
         quality: "HIGH",
         ...mcpWorkflowDefaults,
       },
+    );
+  });
+
+  it("maps a linked or uploaded source video to the video-to-video request", () => {
+    assert.deepEqual(
+      toVideoToVideoRequest(
+        videoToVideoInputSchema.parse({
+          videoUrl: "https://example.com/watch/clip",
+          prompt: "Hand-made claymation with soft studio lighting.",
+          trimStartSeconds: 4,
+          trimEndSeconds: 34,
+          aspectRatio: { width: 9, height: 16 },
+          quality: "MAX",
+          audio: "GENERATE",
+        }),
+      ),
+      {
+        prompt: "Hand-made claymation with soft studio lighting.",
+        videoUrl: "https://example.com/watch/clip",
+        trimStartSeconds: 4,
+        trimEndSeconds: 34,
+        aspectRatio: { width: 9, height: 16 },
+        quality: "MAX",
+        audio: "GENERATE",
+        ...mcpWorkflowDefaults,
+      },
+    );
+
+    assert.deepEqual(
+      toVideoToVideoRequest(
+        videoToVideoInputSchema.parse({
+          videoFileId: "vg_file_source",
+          prompt: "Watercolor painting.",
+          imageFileIds: ["vg_file_reference"],
+        }),
+      ),
+      {
+        prompt: "Watercolor painting.",
+        videoFileId: "vg_file_source",
+        imageFileIds: ["vg_file_reference"],
+        ...mcpWorkflowDefaults,
+      },
+    );
+  });
+
+  it("requires exactly one video-to-video source", () => {
+    assert.equal(
+      videoToVideoInputSchema.safeParse({ prompt: "Watercolor painting." }).success,
+      false,
+    );
+    assert.equal(
+      videoToVideoInputSchema.safeParse({
+        videoFileId: "vg_file_source",
+        videoUrl: "https://example.com/clip.mp4",
+        prompt: "Watercolor painting.",
+      }).success,
+      false,
     );
   });
 });

@@ -3,6 +3,7 @@ import type {
   ScriptToVideoRequest,
   SlideshowToVideoRequest,
   StoryboardToVideoRequest,
+  VideoToVideoRequest,
   VoiceoverToVideoRequest,
 } from "@videogen/sdk";
 import { z } from "zod";
@@ -12,6 +13,7 @@ import {
   scriptToVideoInputSchema,
   slideshowToVideoInputSchema,
   storyboardToVideoInputSchema,
+  videoToVideoInputSchema,
   voiceoverToVideoInputSchema,
 } from "./creativeToolContracts";
 import { styleToVisualStyle } from "./creativeToolMappings";
@@ -21,12 +23,10 @@ type VoiceoverToVideoInput = z.infer<typeof voiceoverToVideoInputSchema>;
 type SlideshowToVideoInput = z.infer<typeof slideshowToVideoInputSchema>;
 type StoryboardToVideoInput = z.infer<typeof storyboardToVideoInputSchema>;
 type PromptToVideoClipInput = z.infer<typeof promptToVideoClipInputSchema>;
+type VideoToVideoInput = z.infer<typeof videoToVideoInputSchema>;
 
 const mcpWorkflowDefaults = {
   isOutputTemporary: false as const,
-  // Keep generated files on the dashboard. MCP users make one-off projects and
-  // expect them to appear in the app. Hiding from the UI is opt-in on the API.
-  hideFromUi: false as const,
 };
 
 const mcpAutoExportFields = ({
@@ -109,7 +109,12 @@ export function toStoryboardToVideoRequest(
       ...(scene.voiceoverScript != null && { voiceoverScript: scene.voiceoverScript }),
       ...(scene.title != null && { title: scene.title }),
       ...(scene.durationSeconds != null && { durationSeconds: scene.durationSeconds }),
+      ...(scene.actorEntityIds != null && { actorEntityIds: scene.actorEntityIds }),
+      ...(scene.productEntityIds != null && { productEntityIds: scene.productEntityIds }),
+      ...(scene.visualStyleEntityId != null && { visualStyleEntityId: scene.visualStyleEntityId }),
     })),
+    ...(input.actorEntityIds != null && { actorEntityIds: input.actorEntityIds }),
+    ...(input.productEntityIds != null && { productEntityIds: input.productEntityIds }),
     defaultGeneration: { aiStyle: input.style ?? DEFAULT_MCP_AI_STYLE },
     ...mcpWorkflowDefaults,
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
@@ -129,5 +134,21 @@ export function toPromptToVideoClipRequest(
     ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
+  };
+}
+
+export function toVideoToVideoRequest(input: VideoToVideoInput): VideoToVideoRequest {
+  return {
+    prompt: input.prompt,
+    ...mcpWorkflowDefaults,
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
+    ...(input.videoFileId != null && { videoFileId: input.videoFileId }),
+    ...(input.videoUrl != null && { videoUrl: input.videoUrl }),
+    ...(input.trimStartSeconds != null && { trimStartSeconds: input.trimStartSeconds }),
+    ...(input.trimEndSeconds != null && { trimEndSeconds: input.trimEndSeconds }),
+    ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
+    ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
+    ...(input.quality != null && { quality: input.quality }),
+    ...(input.audio != null && { audio: input.audio }),
   };
 }

@@ -12,7 +12,7 @@ Workflows, standalone media tools, and project exports are asynchronous. Start t
 
 | Work | Start tool | Id to keep |
 | --- | --- | --- |
-| End-to-end video | `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip` | `workflowRunId` (and `projectId` when present) |
+| End-to-end video | `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video` | `workflowRunId` (and `projectId` when present) |
 | Single media asset | `generate_image`, `generate_video_clip`, `text_to_speech`, … | `toolExecutionId` |
 | MP4 render | `export_project` | `exportId` (+ `projectId`) |
 

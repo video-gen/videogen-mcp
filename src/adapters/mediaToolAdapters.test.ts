@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { generateVideoClipInputSchema } from "./creativeToolContracts";
 import {
   toGenerateAvatarRequest,
   toGenerateImageRequest,
@@ -19,7 +20,6 @@ import {
 const persistentSingleResult = {
   numResults: 1,
   isOutputTemporary: false,
-  hideFromUi: false,
 };
 
 const persistentSingleResultWithAutoWatermark = {
@@ -27,8 +27,8 @@ const persistentSingleResultWithAutoWatermark = {
   watermarkMode: "AUTO",
 };
 
-describe("media MCP adapters", () => {
-  it("maps generative image and video inputs", () => {
+void describe("media MCP adapters", () => {
+  void it("maps generative image and video inputs", () => {
     assert.deepEqual(
       toGenerateImageRequest({
         prompt: "A premium product photo.",
@@ -98,7 +98,28 @@ describe("media MCP adapters", () => {
     );
   });
 
-  it("maps audio and motion inputs", () => {
+  void it("preserves combined image/video references at High and Max", () => {
+    const qualities: Array<"HIGH" | "MAX"> = ["HIGH", "MAX"];
+    for (const quality of qualities) {
+      const inputs = {
+        prompt: "Use the product images and reference motion together.",
+        startFrameFileId: "vg_file_start",
+        imageFileIds: ["vg_file_product"],
+        videoFileIds: ["vg_file_motion"],
+        quality,
+      };
+      assert.deepEqual(
+        toGenerateVideoClipRequest(generateVideoClipInputSchema.parse(inputs)),
+        {
+          ...inputs,
+          generateAudio: false,
+          ...persistentSingleResultWithAutoWatermark,
+        },
+      );
+    }
+  });
+
+  void it("maps audio and motion inputs", () => {
     assert.deepEqual(
       toTextToSpeechRequest({
         text: "Hello.",
@@ -164,7 +185,7 @@ describe("media MCP adapters", () => {
     );
   });
 
-  it("maps file transforms without exposing operational fields", () => {
+  void it("maps file transforms without exposing operational fields", () => {
     assert.deepEqual(toVectorizeImageRequest({ imageFileId: "vg_file_image" }), {
       imageFileId: "vg_file_image",
       ...persistentSingleResultWithAutoWatermark,

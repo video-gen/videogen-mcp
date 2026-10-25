@@ -195,7 +195,7 @@ List the status of remix actions applied to a project.
 
 ### list_projects
 
-List projects. API-created projects only by default; pass includeUiProjects to also include dashboard projects.
+List projects, including projects created in the dashboard.
 
 ### list_tool_executions
 
@@ -212,6 +212,8 @@ List workflow runs, most recent first.
 ### open_uploader
 
 Open an in-chat file uploader (ChatGPT only). The user picks a file, it is uploaded to VideoGen, and its file id (vg_file_...) is reported back for use in voiceover_to_video, slideshow_to_video, logos, or B-roll. Prefer this over asking the user to paste a link. On clients without in-chat UI, use upload_file (small files) or create_file_upload (large files) instead.
+
+On `/mcp/chatgpt`, pass files the user already attached in `files`. `upload_file` and `create_file_upload` are widget-only on that surface, because a filename does not upload a ChatGPT attachment.
 
 ### prompt_to_video_clip
 

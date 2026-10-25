@@ -14,8 +14,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
-    "rootDir": "."
+    "rootDir": ".."
   },
-  "include": ["*.tsx", "*.ts"],
+  "include": ["*.tsx", "*.ts", "../src/chatgptAttachmentFiles.ts"],
   "exclude": ["node_modules", "*.test.ts"]
 }

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatMcpAiStylePresetExamplesMarkdown } from "../adapters/aiStylePresetExamples";
 import {
   CHATGPT_APP_CREDITS_GUIDANCE,
   type McpHostSurface,
@@ -47,6 +48,30 @@ function loadMarkdown(filename: string): string {
 const CREDITS_GUIDANCE_BLOCK_PATTERN =
   /<!-- mcp-host-credits-guidance -->[\s\S]*?<!-- \/mcp-host-credits-guidance -->/;
 
+const UPLOAD_GUIDANCE_BLOCK_PATTERN =
+  /<!-- mcp-host-upload-guidance -->[\s\S]*?<!-- \/mcp-host-upload-guidance -->/;
+
+const STANDARD_UPLOAD_GUIDANCE = `- **ChatGPT (hosted)**: call \`open_uploader\`. When the user already attached files in the chat, pass them in \`files\`. A filename is not the file and does not upload it.
+- **Hosted remote**: \`upload_file\` with inline base64 for small files, or \`create_file_upload\` then \`PUT\` bytes to the returned URL, then \`get_file\` with \`wait: true\`.
+- **Local stdio**: \`upload_file\` with a local \`filePath\`.`;
+
+const CHATGPT_APP_UPLOAD_GUIDANCE = `- Call \`open_uploader\` to import a photo or file. When the user already attached files in the chat, pass each attachment in \`files\`. A filename is not the file and does not upload it.`;
+
+const AI_STYLE_EXAMPLES_BLOCK_PATTERN =
+  /<!-- mcp-ai-style-examples -->[\s\S]*?<!-- \/mcp-ai-style-examples -->/;
+
+/** Inserts the full default-style table so workflow guidance can be copied verbatim. */
+export const applyAiStylePresetExamples = ({
+  markdown,
+}: {
+  markdown: string;
+}): string => {
+  return markdown.replace(
+    AI_STYLE_EXAMPLES_BLOCK_PATTERN,
+    formatMcpAiStylePresetExamplesMarkdown(),
+  );
+};
+
 /** Swaps the getting-started credits block for STANDARD vs ChatGPT Apps policy. */
 export const applyHostSurfaceCreditsGuidance = ({
   markdown,
@@ -65,6 +90,26 @@ export const applyHostSurfaceCreditsGuidance = ({
   }
 
   return markdown.replace(CREDITS_GUIDANCE_BLOCK_PATTERN, replacement);
+};
+
+/** Swaps upload instructions so ChatGPT is not told to call tools that cannot see attachments. */
+export const applyHostSurfaceUploadGuidance = ({
+  markdown,
+  hostSurface,
+}: {
+  markdown: string;
+  hostSurface: McpHostSurface;
+}): string => {
+  const replacement =
+    hostSurface === "CHATGPT_APP" ? CHATGPT_APP_UPLOAD_GUIDANCE : STANDARD_UPLOAD_GUIDANCE;
+
+  if (!UPLOAD_GUIDANCE_BLOCK_PATTERN.test(markdown)) {
+    throw new Error(
+      "getting-started.md is missing the <!-- mcp-host-upload-guidance --> block required for host-specific upload copy.",
+    );
+  }
+
+  return markdown.replace(UPLOAD_GUIDANCE_BLOCK_PATTERN, replacement);
 };
 
 const BASE_GUIDANCE_DOCUMENTS: readonly Omit<GuidanceDocument, "markdown">[] = [
@@ -124,17 +169,29 @@ export const getGuidanceDocuments = ({
       throw new Error(`Missing guidance markdown for ${doc.id}`);
     }
 
-    const markdown =
-      doc.id === "getting-started"
-        ? applyHostSurfaceCreditsGuidance({ markdown: rawMarkdown, hostSurface })
-        : rawMarkdown;
+    const markdown = (() => {
+      if (doc.id === "getting-started") {
+        return applyHostSurfaceUploadGuidance({
+          markdown: applyHostSurfaceCreditsGuidance({
+            markdown: rawMarkdown,
+            hostSurface,
+          }),
+          hostSurface,
+        });
+      }
+
+      if (doc.id === "workflows") {
+        return applyAiStylePresetExamples({ markdown: rawMarkdown });
+      }
+
+      return rawMarkdown;
+    })();
 
     return { ...doc, markdown };
   });
 
 /** STANDARD-host documents (stdio / `/mcp`). Prefer getGuidanceDocuments for ChatGPT. */
-export const GUIDANCE_DOCUMENTS: readonly GuidanceDocument[] = getGuidanceDocuments({
-  hostSurface: "STANDARD",
-});
+export const GUIDANCE_DOCUMENTS: readonly GuidanceDocument[] =
+  getGuidanceDocuments({ hostSurface: "STANDARD" });
 
 export const GUIDANCE_MIME_TYPE = "text/markdown";

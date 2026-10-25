@@ -10773,7 +10773,7 @@
     {
       "name": "list_projects",
       "title": "List projects",
-      "description": "List projects. API-created projects only by default; pass includeUiProjects to also include dashboard projects.",
+      "description": "List projects, including projects created in the dashboard.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10790,10 +10790,6 @@
           },
           "selfOnly": {
             "description": "When true, restrict results to items created by the API key owner rather than the whole team.",
-            "type": "boolean"
-          },
-          "includeUiProjects": {
-            "description": "Include projects created in the VideoGen dashboard, not just API-created ones.",
             "type": "boolean"
           }
         }

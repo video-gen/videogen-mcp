@@ -14,9 +14,9 @@ Ask what “done” looks like for the user.
 
 - They want a **multi-scene, narrated, professionally assembled video**
 - They need an **editable project** they can remix and export to MP4
-- Input is a **script**, **voiceover file**, **slideshow**, **storyboard**, or **short prompt-as-project clip**
+- Input is a **script**, **voiceover file**, **slideshow**, **storyboard**, **short prompt-as-project clip**, or an **existing video to restyle**
 
-Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`). Wait until `succeeded` and give the user `downloadUrl` (auto-export is on by default). Details: `get_workflows_guidance`.
+Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`). Wait until `succeeded` and give the user `downloadUrl` (auto-export is on by default). Details: `get_workflows_guidance`.
 
 **Which workflow?** For ~1 minute+ narrated / informational / news-style videos from text, prefer **`script_to_video`**. Use **`storyboard_to_video`** only for short, shot-directed spots, and **never more than 3 scenes** unless the user explicitly asks for more (storyboard is much more credit-heavy per scene). If the user has not named a workflow, **ask** with a short pros/cons (script vs storyboard) before starting.
 
@@ -74,7 +74,7 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 
 ## Workflows catalog (MCP)
 
-- `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`
+- `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`
 - `list_workflow_runs`, `get_workflow_run`, `cancel_workflow_run`
 - Then wait for `succeeded` and use `downloadUrl` (default auto-export). Set `autoExport: false` only if you need `remix_project` before `export_project`.
 
@@ -87,10 +87,11 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 | “What can VideoGen do?” | Lead with finished-video workflows and pretty prompts such as “Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover” or “Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end”. Do not open with `generate_motion_graphic` or a countdown. |
 | “Make a 60s explainer from this script” | `script_to_video` (default auto-export) → give the user `downloadUrl` |
 | “Make a ~1 minute 16:9 video about a product launch” (no workflow named) | Ask script vs storyboard (pros/cons); default recommendation **`script_to_video`** |
-| “Storyboard three hero shots of the bottle” | `storyboard_to_video` with ≤ 3 scenes |
+| “Storyboard three hero shots of the bottle” | `storyboard_to_video` with ≤ 3 scenes. If a PRODUCT entity exists, put its id in each scene's `productEntityIds` |
 | “Generate a hero image of a blue bottle” | `generate_image` |
 | “Turn this MP3 into a video with b-roll” | upload → `voiceover_to_video` → `downloadUrl` |
 | “One 8-second product teaser, just the clip file” | `generate_video_clip` |
+| “Make this product video look like claymation” (with a link or an uploaded video) | `video_to_video` with `videoUrl` or `videoFileId` |
 | “Add captions and a Ken Burns zoom on my project” | `remix_project` with `CAPTIONS` and `ZOOM` |
 | “Turn the stills into generated video clips” | `remix_project` with `CONVERT_IMAGES_TO_VIDEOS` (expensive; confirm first) |
 | “Remove the background from this PNG” | upload → `remove_image_background` |

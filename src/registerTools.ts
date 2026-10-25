@@ -9,6 +9,7 @@ import { registerAccountTools } from "./tools/account";
 import { registerAppDeepLinkTool } from "./tools/appDeepLink";
 import { registerEntityTools } from "./tools/entities";
 import { registerFileTools } from "./tools/files";
+import { registerHomeWidget } from "./tools/homeWidget";
 import { registerMediaPreviewWidget } from "./tools/mediaPreviewWidget";
 import { registerMediaToolTools } from "./tools/mediaTools";
 import { registerProjectTools } from "./tools/projects";
@@ -32,7 +33,7 @@ export function registerTools(
   registerWorkflowTools(server, getClient, operations);
   registerMediaToolTools(server, getClient, operations, mediaPreviewMeta);
   registerProjectTools(server, getClient, operations, mediaPreviewMeta);
-  registerFileTools(server, getClient, executionMode, operations, mediaPreviewMeta);
+  registerFileTools(server, getClient, executionMode, operations, mediaPreviewMeta, hostSurface);
   registerEntityTools(server, getClient, operations);
   registerResourceTools(server, getClient, operations);
   registerAccountTools(server, getClient, operations);
@@ -41,7 +42,8 @@ export function registerTools(
   // ChatGPT App widgets need the MCP Apps host bridge (`window.openai`), which
   // only the HOSTED (Streamable HTTP) transport is reached through.
   if (executionMode === "HOSTED") {
-    registerUploadWidget(server);
+    registerHomeWidget(server);
+    registerUploadWidget(server, hostSurface);
     registerMediaPreviewWidget(server);
   }
 }

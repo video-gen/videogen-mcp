@@ -44,6 +44,7 @@ const ALL_HOSTED_TOOLS = [
   "slideshow_to_video",
   "storyboard_to_video",
   "prompt_to_video_clip",
+  "video_to_video",
   "list_workflow_runs",
   "get_workflow_run",
   "cancel_workflow_run",
@@ -92,6 +93,7 @@ const ALL_HOSTED_TOOLS = [
   "get_app_deep_link",
   // upload widget (HOSTED only)
   "open_uploader",
+  "open_home",
 ];
 
 // Tools whose failure is logged but does not fail the suite. See the module doc.
@@ -1051,6 +1053,10 @@ export async function runFullCoverage({
     await call("open_uploader", {});
   });
 
+  await step("open_home", async () => {
+    await call("open_home", {});
+  });
+
   // ---- summary ----
   const passed = outcomes.filter((outcome) => outcome.status === "pass");
   const skipped = outcomes.filter((outcome) => outcome.status === "skip");
@@ -1081,7 +1087,7 @@ async function resolveAnyWorkflowRunId(
 async function resolveAnyProjectId(
   call: (name: string, args: Record<string, unknown>) => Promise<unknown>,
 ): Promise<string | null> {
-  const json = await call("list_projects", { limit: 1, includeUiProjects: true });
+  const json = await call("list_projects", { limit: 1 });
   return findPrefixedId(json, "vg_proj_");
 }
 

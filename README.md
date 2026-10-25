@@ -10,6 +10,29 @@ Find the hosted server on [Smithery](https://smithery.ai/servers/videogen/videog
 
 ## ChatGPT
 
+The hosted plugin includes a VideoGen home sidebar app (`open_home`). It follows
+the product home: the general creation prompt and suggestions, recent projects,
+example categories, featured workflows, reusable assets, and templates. Browsing
+does not start generation; Start sends the draft into a ChatGPT conversation.
+Project and library links open the matching VideoGen environment.
+
+The home catalog is generated from the same helpers as `frontend/` and committed
+in `web/homeCatalog.ts`, keeping the standalone MCP/npm/Docker build independent
+of internal packages. After changing the product catalog, refresh it from the
+repo root with `cd api && node --import tsx scripts/generate-chatgpt-home.ts`
+(with current base/defs/static JS builds). `build:js` bundles the page alongside
+the existing upload and preview widgets. Deploy MCP and rescan the existing
+plugin before expecting the sidebar entry to be available in ChatGPT.
+
+Home-specific checks (no browser or live account required):
+
+```sh
+cd mcp
+node --import ./test/register.mjs --test src/homeWidget.test.ts test/homeBridge.test.mjs
+cd ../api
+TSX_TSCONFIG_PATH=../mcp/web/tsconfig.json node --import tsx --test ../mcp/test/homePage.test.tsx
+```
+
 Use the public [VideoGen plugin on the ChatGPT Plugins Directory](https://chatgpt.com/plugins/plugin_asdk_app_6a7632963b6c8191b3da907392ba6676). That is the supported way for every user to run VideoGen in ChatGPT.
 
 The `/mcp/chatgpt` endpoint, ChatGPT Apps commerce notes, `open_uploader` widget, and the connector checklist later in this file are for **internal testing** of that plugin.
@@ -57,7 +80,7 @@ The remote server:
 - Reads the API key or OAuth access token from the `Authorization: Bearer` header. The standard `/mcp` endpoint requires credentials for every request and returns `401` with a `WWW-Authenticate` challenge to start OAuth. The internal-testing `/mcp/chatgpt` endpoint serves tool discovery unauthenticated and returns its OAuth challenge on a protected tool result because ChatGPT does not start OAuth from the standard transport challenge. The credential is forwarded only to the VideoGen API and never stored.
 - Exposes `GET /health` for load-balancer / Cloud Run startup probes.
 - Handles CORS preflight (`OPTIONS`) so browser-based clients can connect.
-- Supports three upload paths. For small assets (images, logos, short audio), `upload_file` takes base64-encoded contents inline (`fileData`). For large files, `create_file_upload` returns `{ fileId, uploadUrl }`; the client `PUT`s the raw bytes to that short-lived pre-signed URL (no `Authorization` header) and then calls `get_file` with `{ fileId, wait: true }` to wait for processing. On the internal-testing `/mcp/chatgpt` surface, `open_uploader` renders an in-chat upload widget so the user can pick a file directly: the widget itself calls `create_file_upload`, `PUT`s the bytes client-side, and reports back only the resulting `vg_file_...` id, so the pre-signed URL is never surfaced to the model. Either way you get a `vg_file_...` id to pass to other tools. The local (stdio) server instead uploads by local `filePath`. (The server never fetches a caller-supplied URL, so there is no SSRF surface.)
+- Supports three upload paths. For small assets (images, logos, short audio), `upload_file` takes base64-encoded contents inline (`fileData`). For large files, `create_file_upload` returns `{ fileId, uploadUrl }`; the client `PUT`s the raw bytes to that short-lived pre-signed URL (no `Authorization` header) and then calls `get_file` with `{ fileId, wait: true }` to wait for processing. On the internal-testing `/mcp/chatgpt` surface, `open_uploader` renders an in-chat upload widget so the user can pick a file directly, or pass photos they already attached (`files`). The widget itself calls `create_file_upload`, `PUT`s the bytes client-side, and reports back only the resulting `vg_file_...` id, so the pre-signed URL is never surfaced to the model. On that surface `upload_file` and `create_file_upload` are hidden from the model (`ui.visibility` is `app` only): a filename does not upload a ChatGPT attachment, and the server never fetches the attachment URL. Either way you get a `vg_file_...` id to pass to other tools. The local (stdio) server instead uploads by local `filePath`. (The server never fetches a caller-supplied URL, so there is no SSRF surface.)
 
 ### Local (stdio) — Cursor / Claude Desktop
 
@@ -107,13 +130,13 @@ See the [callable tool reference](./TOOL_SCHEMAS.md) and [complete input/output 
 
 `upload_file`, `create_file_upload`, `get_file`, `list_files`, `open_uploader`
 
-`open_uploader` is a widget on the **internal-testing** `/mcp/chatgpt` surface (remote server only): it renders an in-chat file picker (a React component served as an MCP UI resource) so a ChatGPT user can attach a file without pasting a link. It is a no-op on clients that don't render MCP Apps UI — those use `upload_file` / `create_file_upload` instead. ChatGPT users should use the [public VideoGen plugin](https://chatgpt.com/plugins/plugin_asdk_app_6a7632963b6c8191b3da907392ba6676).
+`open_uploader` is a widget on the **internal-testing** `/mcp/chatgpt` surface (remote server only): it renders an in-chat file picker (a React component served as an MCP UI resource) so a ChatGPT user can attach a file without pasting a link. Pass photos already attached in the chat as `files`. It is a no-op on clients that don't render MCP Apps UI. Those use `upload_file` / `create_file_upload` instead. ChatGPT users should use the [public VideoGen plugin](https://chatgpt.com/plugins/plugin_asdk_app_6a7632963b6c8191b3da907392ba6676).
 
 ### Entities
 
 `list_entities`, `create_entity`, `get_entity`, `update_entity`, `archive_entity`, `add_entity_reference`, `remove_entity_reference`
 
-Create ACTOR / PRODUCT / VISUAL_STYLE entities, attach uploaded image references, then pass `vg_enti_...` ids into workflows and `generate_avatar` (`actorEntityId`, storyboard entity attachments, etc.).
+Create ACTOR / PRODUCT / VISUAL_STYLE entities, attach uploaded image references, then pass `vg_enti_...` ids into workflows and `generate_avatar` (`actorEntityId`; on `storyboard_to_video`, per-scene `productEntityIds` / `actorEntityIds` / `visualStyleEntityId`).
 
 ### Resources & account
 

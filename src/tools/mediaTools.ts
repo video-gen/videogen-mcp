@@ -36,11 +36,13 @@ import {
 } from "../inputSchemas";
 import { type McpOperations, dropUndefined } from "../operations";
 import {
+  cancelToolExecutionOutputSchema,
+  getToolExecutionOutputSchema,
   listToolExecutionsOutputSchema,
   toolExecutionOutputSchema,
 } from "../outputSchemas";
 import {
-  DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
+  IDEMPOTENT_DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
   READ_ONLY_TOOL_ANNOTATIONS,
   WRITE_PRIVATE_TOOL_ANNOTATIONS,
 } from "../toolAnnotations";
@@ -97,7 +99,7 @@ export function registerMediaToolTools(
     {
       title: "Generate video clip",
       description:
-        "Generate a video clip from a text prompt, source images, source videos, spokenDialogue, or reference audio. quality is optional (LOW, STANDARD, HIGH, or MAX). Typically takes 1–3 minutes (HIGH/MAX can be longer). Tell the user that wait up front and keep polling calmly.",
+        "Generate a video clip from a text prompt, source images, source videos, spokenDialogue, or reference audio. Combining videoFileIds with startFrameFileId or imageFileIds requires quality HIGH or MAX. Reference media guides generation without guaranteeing exact reproduction. Typically takes 1–3 minutes (HIGH/MAX can be longer). Tell the user that wait up front and keep polling calmly.",
       inputSchema: generateVideoClipInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -114,7 +116,7 @@ export function registerMediaToolTools(
     "text_to_speech",
     {
       title: "Text to speech",
-      description: "Convert text into spoken audio using a selectable voice.",
+      description: "Synthesize spoken audio from text using a catalog voice that supportsDirectToolExecution. Returns toolExecutionId on hosted clients; poll get_tool_execution for status and results containing the audio fileId, downloadUrl, and file metadata. Local calls wait for a status snapshot.",
       inputSchema: textToSpeechInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -131,7 +133,7 @@ export function registerMediaToolTools(
     "generate_sound_effect",
     {
       title: "Generate sound effect",
-      description: "Generate a sound effect from a text prompt.",
+      description: "Synthesize a standalone audio effect from a description of the desired sound and timing. Returns toolExecutionId; use get_tool_execution to retrieve the generated audio file and download URL.",
       inputSchema: generateSoundEffectInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -185,7 +187,7 @@ export function registerMediaToolTools(
     {
       title: "Generate avatar",
       description:
-        "Generate a talking-head avatar video from an ACTOR entity and an uploaded audio file. Pass actorEntityId and optionally set avatarQuality. Typically takes a few minutes (longer for longer audio). Tell the user that wait up front.",
+        "Generate a talking-head avatar video from an ACTOR entity and an uploaded audio file. Pass actorEntityId and optionally set avatarQuality. Typically takes a few minutes (longer for longer audio). Tell the user that wait up front. Returns toolExecutionId; get_tool_execution provides status and results with the avatar video file and download URL.",
       inputSchema: generateAvatarInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -202,7 +204,7 @@ export function registerMediaToolTools(
     "vectorize_image",
     {
       title: "Vectorize image",
-      description: "Convert a raster image into a vector (SVG).",
+      description: "Create an SVG vector version of an existing raster image. Returns toolExecutionId; get_tool_execution provides status and results with the SVG fileId and downloadUrl.",
       inputSchema: vectorizeImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -219,7 +221,8 @@ export function registerMediaToolTools(
     "remove_image_background",
     {
       title: "Remove image background",
-      description: "Remove the background from an image.",
+      description:
+        "Create a new image with the background removed. The source file is left unchanged. Returns toolExecutionId; get_tool_execution provides status and results with the output image fileId and downloadUrl.",
       inputSchema: removeImageBackgroundInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -237,7 +240,8 @@ export function registerMediaToolTools(
     "remove_video_background",
     {
       title: "Remove video background",
-      description: "Remove the background from a video.",
+      description:
+        "Create a new video with the background removed. The source file is left unchanged. Returns toolExecutionId; get_tool_execution provides status and results with the output video fileId and downloadUrl.",
       inputSchema: removeVideoBackgroundInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -255,7 +259,7 @@ export function registerMediaToolTools(
     "upscale_image",
     {
       title: "Upscale image",
-      description: "Increase the resolution of an image.",
+      description: "Create a higher-resolution copy of an existing image for sharper presentation. Returns toolExecutionId; get_tool_execution provides status and the output image file. The source file is unchanged.",
       inputSchema: upscaleImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -272,7 +276,7 @@ export function registerMediaToolTools(
     "upscale_video",
     {
       title: "Upscale video",
-      description: "Increase the resolution of a video.",
+      description: "Create a higher-resolution copy of an existing video. Returns toolExecutionId; get_tool_execution provides status and the output video file. The source file is unchanged.",
       inputSchema: upscaleVideoInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -322,9 +326,9 @@ export function registerMediaToolTools(
     "get_tool_execution",
     {
       title: "Get tool execution",
-      description: "Fetch the current status and results of a single tool execution.",
+      description: "Return a tool execution snapshot with status, progress, attemptIndex, error details, and results. Each result includes fileId, file metadata, downloadUrl, and thumbnailUrl when available. Use this to poll a started generation without creating another asset.",
       inputSchema: getToolExecutionInputSchema,
-      outputSchema: toolExecutionOutputSchema,
+      outputSchema: getToolExecutionOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
     },
     async (args) =>
@@ -338,10 +342,10 @@ export function registerMediaToolTools(
     "cancel_tool_execution",
     {
       title: "Cancel tool execution",
-      description: "Request cancellation of an in-progress tool execution.",
+      description: "Request cancellation of an API-started media generation or transformation. Pending work is stopped; completed files are not deleted. Any open review for a completed result is dismissed. Returns only toolExecutionId as an acknowledgment; use get_tool_execution to read status and results.",
       inputSchema: cancelToolExecutionInputSchema,
-      outputSchema: toolExecutionOutputSchema,
-      annotations: DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
+      outputSchema: cancelToolExecutionOutputSchema,
+      annotations: IDEMPOTENT_DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) =>
       await respondSdk(() =>

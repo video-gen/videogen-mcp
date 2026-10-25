@@ -13,6 +13,7 @@ const CREATIVE_TOOL_NAMES = new Set([
   "slideshow_to_video",
   "storyboard_to_video",
   "prompt_to_video_clip",
+  "video_to_video",
   "generate_image",
   "generate_video_clip",
   "text_to_speech",
@@ -49,6 +50,9 @@ const FORBIDDEN_FIELDS = [
   "defaultGeneration",
   "defaultDurationSeconds",
   "generation",
+];
+
+const STORYBOARD_ENTITY_ATTACHMENT_FIELDS = [
   "actorEntityIds",
   "productEntityIds",
   "visualStyleEntityId",
@@ -136,6 +140,14 @@ describe("creative tools/list contracts", () => {
             serializedSchema.includes(`"${forbiddenField}"`),
             false,
             `${tool.name} advertises forbidden field ${forbiddenField}`,
+          );
+        }
+
+        for (const entityField of STORYBOARD_ENTITY_ATTACHMENT_FIELDS) {
+          assert.equal(
+            serializedSchema.includes(`"${entityField}"`),
+            tool.name === "storyboard_to_video",
+            `${tool.name} entity attachment field ${entityField}`,
           );
         }
       }

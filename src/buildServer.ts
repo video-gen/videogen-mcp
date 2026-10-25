@@ -96,6 +96,17 @@ export function buildMcpServer(
     {
       name: SERVER_NAME,
       version: SERVER_VERSION,
+      title: "VideoGen",
+      description:
+        "Create and edit videos from scripts, storyboards, voiceovers, and slides. Generate images, video clips, speech, music, and sound effects; manage reference assets and export finished MP4 videos.",
+      websiteUrl: "https://videogen.io",
+      icons: [
+        {
+          src: "https://videogen.io/logos/logo-red.svg",
+          mimeType: "image/svg+xml",
+          sizes: ["any"],
+        },
+      ],
     },
     {
       instructions: getServerInstructionsForHostSurface({ hostSurface }),

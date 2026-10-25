@@ -1,24 +1,26 @@
-$ tsup && tsup --config tsup.widget.config.ts
-CLI Building entry: src/http.ts, src/index.ts, src/smoke.ts
-CLI Using tsconfig: tsconfig.json
-CLI tsup v8.5.1
-CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.config.ts
-CLI Target: node20
-CLI Cleaning output folder
-ESM Build start
-ESM dist/http.js      148.24 KB
-ESM dist/index.js     127.87 KB
-ESM dist/smoke.js     33.75 KB
-ESM dist/smoke.js.map 69.05 KB
-ESM dist/http.js.map  313.27 KB
-ESM dist/index.js.map 263.03 KB
-ESM ⚡️ Build success in 34ms
-CLI Building entry: {"uploadWidget":"web/uploadWidget.tsx","mediaPreviewWidget":"web/mediaPreviewWidget.tsx"}
-CLI Using tsconfig: web/tsconfig.json
-CLI tsup v8.5.1
-CLI Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.widget.config.ts
-CLI Target: es2020
-IIFE Build start
-IIFE dist/widget/mediaPreviewWidget.global.js 197.45 KB
-IIFE dist/widget/uploadWidget.global.js       193.39 KB
-IIFE ⚡️ Build success in 48ms
+
+[2m$ tsup && tsup --config tsup.widget.config.ts[22m
+[34mCLI[39m Building entry: src/http.ts, src/index.ts, src/smoke.ts
+[34mCLI[39m Using tsconfig: tsconfig.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.config.ts
+[34mCLI[39m Target: node20
+[34mCLI[39m Cleaning output folder
+[34mESM[39m Build start
+[32mESM[39m [1mdist/http.js      [22m[32m162.54 KB[39m
+[32mESM[39m [1mdist/smoke.js     [22m[32m33.72 KB[39m
+[32mESM[39m [1mdist/index.js     [22m[32m137.92 KB[39m
+[32mESM[39m [1mdist/http.js.map  [22m[32m337.83 KB[39m
+[32mESM[39m [1mdist/index.js.map [22m[32m279.20 KB[39m
+[32mESM[39m [1mdist/smoke.js.map [22m[32m69.01 KB[39m
+[32mESM[39m ⚡️ Build success in 34ms
+[heavy-lock] waiting for tsup in /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/media-url-import (pid 42302, running 0s) to finish. Set VIDEOGEN_HEAVY_LOCK_NO_WAIT=1 to skip instead of waiting.
+[34mCLI[39m Building entry: {"uploadWidget":"web/uploadWidget.tsx","mediaPreviewWidget":"web/mediaPreviewWidget.tsx"}
+[34mCLI[39m Using tsconfig: web/tsconfig.json
+[34mCLI[39m tsup v8.5.1
+[34mCLI[39m Using tsup config: /Users/davidgrossman/GitHub/videogen-main-reprioritize-workflows/mcp/tsup.widget.config.ts
+[34mCLI[39m Target: es2020
+[34mIIFE[39m Build start
+[32mIIFE[39m [1mdist/widget/mediaPreviewWidget.global.js [22m[32m197.45 KB[39m
+[32mIIFE[39m [1mdist/widget/uploadWidget.global.js       [22m[32m193.39 KB[39m
+[32mIIFE[39m ⚡️ Build success in 52ms

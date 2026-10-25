@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { McpExecutionMode } from "../buildServer";
 import { MEDIA_PREVIEW_TOOL_META } from "../appWidget";
 import type { GetVideoGenClient } from "../client";
+import type { McpHostSurface } from "../hostSurface";
 import {
   createFileUploadInputSchema,
   getFileInputSchema,
@@ -66,15 +67,67 @@ function fileHasReadySource(snapshot: unknown): boolean {
   );
 }
 
+const APP_ONLY_TOOL_VISIBILITY = ["app"];
+
+/**
+ * ChatGPT's model can see a photo's filename, not its bytes. `upload_file` and
+ * `create_file_upload` stay callable by the uploader widget (`visibility: app`)
+ * and disappear from the model, so a filename cannot reserve an empty file.
+ */
+function readMetaResourceUri(meta: object | null): string | null {
+  if (meta == null || !("ui" in meta)) {
+    return null;
+  }
+
+  const existingUi = meta.ui;
+
+  if (typeof existingUi !== "object" || existingUi == null || !("resourceUri" in existingUi)) {
+    return null;
+  }
+
+  return typeof existingUi.resourceUri === "string" ? existingUi.resourceUri : null;
+}
+
+function chatgptAppOnlyToolMeta(meta: object | null): {
+  ui: { visibility: string[]; resourceUri?: string };
+  "openai/widgetAccessible": true;
+} {
+  const resourceUri = readMetaResourceUri(meta);
+
+  return {
+    ...(meta ?? {}),
+    ui: {
+      ...(resourceUri != null ? { resourceUri } : {}),
+      visibility: APP_ONLY_TOOL_VISIBILITY,
+    },
+    "openai/widgetAccessible": true,
+  };
+}
+
 export function registerFileTools(
   server: McpServer,
   getClient: GetVideoGenClient,
   executionMode: McpExecutionMode,
   { respondSdk, awaitReady, toErrorResult }: McpOperations,
   mediaPreviewMeta: typeof MEDIA_PREVIEW_TOOL_META | null,
+  hostSurface: McpHostSurface,
 ): void {
+  const hideDirectUploadsFromModel = executionMode === "HOSTED" && hostSurface === "CHATGPT_APP";
+  const uploadFileMeta =
+    mediaPreviewMeta == null
+      ? null
+      : {
+          ...mediaPreviewMeta,
+          "openai/toolInvocation/invoking": "Uploading file…",
+          "openai/toolInvocation/invoked": "File ready",
+        };
+
   const mediaPreviewToolFields =
-    mediaPreviewMeta != null ? { _meta: mediaPreviewMeta } : {};
+    uploadFileMeta == null
+      ? {}
+      : {
+          _meta: hideDirectUploadsFromModel ? chatgptAppOnlyToolMeta(uploadFileMeta) : uploadFileMeta,
+        };
 
   const finalizeUpload = async ({
     bytes,
@@ -155,8 +208,9 @@ export function registerFileTools(
       "upload_file",
       {
         title: "Upload file",
-        description:
-          "Upload a small file (image, logo, or short audio) to VideoGen by passing its base64-encoded contents, and wait until it is processed. Returns the file with its id (vg_file_...) and signed URLs. Use the returned fileId for voiceover_to_video, slideshow_to_video, logos, or B-roll. For large files, use create_file_upload instead.",
+        description: hideDirectUploadsFromModel
+          ? "Widget-only. A photo attached in ChatGPT is not base64, and a filename does not upload it. Call open_uploader and pass the attachments in files."
+          : "Upload a small file (image, logo, or short audio) to VideoGen by passing its base64-encoded contents, and wait until it is processed. Returns the file with its id (vg_file_...) and signed URLs. Use the returned fileId for voiceover_to_video, slideshow_to_video, logos, or B-roll. For large files, use create_file_upload instead.",
         inputSchema: uploadFileHostedInputSchema,
         outputSchema: fileOutputSchema,
         annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -196,11 +250,15 @@ export function registerFileTools(
     "create_file_upload",
     {
       title: "Create file upload",
-      description:
-        "Start an upload for a large file, or when file bytes cannot be inlined. Returns { fileId, uploadUrl }. PUT the raw file bytes to uploadUrl with NO Authorization header (it is a short-lived pre-signed URL). Then call get_file with { fileId, wait: true } to wait until processing finishes, and pass the returned fileId to workflows, tools, logos, or B-roll. For small files, prefer upload_file.",
+      description: hideDirectUploadsFromModel
+        ? "Widget-only. Do not call this to import a photo attached in ChatGPT. A display name does not contain the file bytes, so this leaves an empty file. Call open_uploader and pass the attachments in files."
+        : "Start an upload for a large file, or when file bytes cannot be inlined. Returns { fileId, uploadUrl }. PUT the raw file bytes to uploadUrl with NO Authorization header (it is a short-lived pre-signed URL). Then call get_file with { fileId, wait: true } to wait until processing finishes, and pass the returned fileId to workflows, tools, logos, or B-roll. For small files, prefer upload_file.",
       inputSchema: createFileUploadInputSchema,
       outputSchema: fileUploadOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
+      ...(hideDirectUploadsFromModel
+        ? { _meta: chatgptAppOnlyToolMeta(null) }
+        : {}),
     },
     async (args) =>
       await respondSdk(() =>

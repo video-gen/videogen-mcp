@@ -23,6 +23,7 @@ import {
   remixProjectOutputSchema,
 } from "../outputSchemas";
 import {
+  DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
   READ_ONLY_TOOL_ANNOTATIONS,
   WRITE_PRIVATE_TOOL_ANNOTATIONS,
 } from "../toolAnnotations";
@@ -40,7 +41,7 @@ export function registerProjectTools(
     {
       title: "List projects",
       description:
-        "List projects. API-created projects only by default; pass includeUiProjects to also include dashboard projects.",
+        "Browse projects in the authenticated team, including dashboard-created projects, most recently updated first. Returns project ids, titles, status, editor URLs, timestamps, and aspect ratios with a pagination cursor.",
       inputSchema: listProjectsInputSchema,
       outputSchema: listProjectsOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -52,7 +53,7 @@ export function registerProjectTools(
     "get_project",
     {
       title: "Get project",
-      description: "Fetch metadata and the shareable URL for a single project.",
+      description: "Return a project's title, readiness status, editor projectUrl, timestamps, aspectRatio, and assistantId when available. Use the projectId for subsequent remix and export calls.",
       inputSchema: getProjectInputSchema,
       outputSchema: projectOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -66,7 +67,7 @@ export function registerProjectTools(
     {
       title: "Export project",
       description:
-        "Export a project to an MP4 and return its status or download URL. Renders often take a few minutes. Tell the user that wait up front.",
+        "Render an editable project to MP4. Returns exportId on hosted clients; poll get_project_export with the same projectId for status, progress, errors, and downloadUrl when ready. Local calls wait for an export snapshot. Renders often take a few minutes. Tell the user that wait up front.",
       inputSchema: exportProjectInputSchema,
       outputSchema: exportProjectOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -94,7 +95,7 @@ export function registerProjectTools(
     {
       title: "Get project export",
       description:
-        "Fetch the current status of a project export. Poll until status is succeeded, failed, or cancelled.",
+        "Return an export snapshot with status, progress, errors, and downloadUrl, exportFileId, thumbnailUrl, and file metadata when ready. Poll until status is succeeded, failed, or cancelled.",
       inputSchema: getProjectExportInputSchema,
       outputSchema: projectExportOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -115,10 +116,10 @@ export function registerProjectTools(
     {
       title: "Remix project",
       description:
-        "Apply curated edits to an existing project. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still and is expensive. Use ZOOM for cheap Ken Burns camera motion. Poll with list_project_remix_actions for status.",
+        "Apply curated edits to an existing project. The original project is edited in place unless saveAsNewProject is true. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still and is expensive. Use ZOOM for cheap Ken Burns camera motion. Poll with list_project_remix_actions for status.",
       inputSchema: remixProjectInputSchema,
       outputSchema: remixProjectOutputSchema,
-      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
+      annotations: DESTRUCTIVE_PRIVATE_TOOL_ANNOTATIONS,
     },
     async (args) => {
       const { projectId } = args;
@@ -135,7 +136,7 @@ export function registerProjectTools(
     "list_project_remix_actions",
     {
       title: "List project remix actions",
-      description: "List the status of remix actions applied to a project.",
+      description: "Return remix actions for a project with action ids, types, status, progress, attempts, and error details, plus pagination metadata. Poll after remix_project to determine when edits are ready for export.",
       inputSchema: listProjectRemixActionsInputSchema,
       outputSchema: listRemixActionsOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,

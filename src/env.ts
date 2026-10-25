@@ -79,6 +79,18 @@ export type HttpServerConfig = {
    * non-JSON-RPC body.
    */
   openaiAppsChallengeToken: string | null;
+  /**
+   * How many reverse proxies in front of this server append to
+   * `X-Forwarded-For`. Rate limiting trusts only the entry that many positions
+   * from the right; everything left of it is client-supplied.
+   */
+  trustedProxyHopCount: number;
+  /**
+   * Whether a trusted hop that is a Cloudflare edge address is stepped over to
+   * the client our zone recorded just left of it. The step runs only when the
+   * request `Host` is this deployment's public hostname (`publicOrigin`).
+   */
+  trustCloudflareEdgeHop: boolean;
 };
 
 /**
@@ -98,7 +110,58 @@ export function readHttpServerConfig(): HttpServerConfig {
     oauthIssuer: readOauthIssuer(),
     publicOrigin: readPublicOrigin(),
     openaiAppsChallengeToken: readOpenaiAppsChallengeToken(),
+    ...readForwardedForTrust(),
   };
+}
+
+/**
+ * Hosted deployments run on Cloud Run, whose front end always appends the
+ * connecting peer, so one hop is trusted. Through the public hostname that peer
+ * is a Cloudflare edge (proxied DNS) and the real client is the entry our zone
+ * appended just left of it. A direct `*.run.app` caller is keyed on that peer
+ * even when the peer is itself a Cloudflare address, because the hop to its
+ * left was not appended by our zone. LOCAL (including the published npm
+ * package) trusts none, because nothing guarantees a proxy sits in front of
+ * it. Self-hosters behind their own proxy chain can override the count via
+ * `VIDEOGEN_MCP_TRUSTED_PROXY_HOPS`, which disables the Cloudflare step.
+ */
+function readForwardedForTrust(): Pick<
+  HttpServerConfig,
+  "trustedProxyHopCount" | "trustCloudflareEdgeHop"
+> {
+  const override = process.env.VIDEOGEN_MCP_TRUSTED_PROXY_HOPS;
+  const parsedOverride =
+    override != null && override.trim() !== "" ? Number.parseInt(override.trim(), 10) : Number.NaN;
+
+  if (Number.isInteger(parsedOverride) && parsedOverride >= 0) {
+    return { trustedProxyHopCount: parsedOverride, trustCloudflareEdgeHop: false };
+  }
+
+  switch (getVideogenEnvironment()) {
+    case "PROD":
+    case "PRERELEASE":
+    case "DEV":
+      return { trustedProxyHopCount: 1, trustCloudflareEdgeHop: true };
+    case "LOCAL":
+      return { trustedProxyHopCount: 0, trustCloudflareEdgeHop: false };
+  }
+}
+
+/**
+ * Hostname of `publicOrigin`, used to decide whether a Cloudflare peer is our
+ * zone. An override that is not an absolute URL yields null, so the Cloudflare
+ * step stays off.
+ */
+export function getPublicOriginHostname(publicOrigin: string | null): string | null {
+  if (publicOrigin == null || publicOrigin.trim() === "") {
+    return null;
+  }
+
+  try {
+    return new URL(publicOrigin).hostname;
+  } catch {
+    return null;
+  }
 }
 
 /**

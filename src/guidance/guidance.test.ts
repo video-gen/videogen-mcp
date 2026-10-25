@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { z } from "zod";
 import { UPLOAD_WIDGET_URI } from "../appWidget";
 import { type McpExecutionMode, buildMcpServer } from "../buildServer";
 import { createVideoGenClientFromToken } from "../client";
@@ -42,13 +43,9 @@ async function connectClient(
 }
 
 function getTextContent(content: unknown): string {
-  assert.ok(Array.isArray(content), "tool result content should be an array");
-  const first = content[0];
-  assert.ok(
-    first != null && typeof first === "object" && "type" in first && first.type === "text",
-    "guidance tools should return a text content block",
-  );
-  assert.ok("text" in first && typeof first.text === "string");
+  const blocks = z.array(z.object({ type: z.literal("text"), text: z.string() })).parse(content);
+  const first = blocks[0];
+  assert.ok(first != null, "guidance tools should return a text content block");
   return first.text;
 }
 
@@ -129,23 +126,33 @@ void test("async-tasks guidance and server instructions set honest generation wa
 
   const instructions = getServerInstructionsForHostSurface({ hostSurface: "CHATGPT_APP" });
   assert.match(instructions, /2–5 minutes/);
-  assert.match(instructions, /Do not imply a clip will be ready in a few seconds/);
-  assert.match(instructions, /Treat those three values as an inseparable tuple/);
-  assert.match(instructions, /share only the `projectUrl` returned for the succeeded retry/);
+  assert.match(instructions, /Set honest expectations/);
+  assert.match(instructions, /Keep workflowRunId, projectId, and projectUrl together/);
+  assert.match(instructions, /after a retry use only the new run's ids and URL/);
   assert.match(instructions, /account-default branding/);
   assert.equal(/VideoGen Pro|OPEN_UPGRADE/i.test(instructions), false);
 
   const standardInstructions = getServerInstructionsForHostSurface({ hostSurface: "STANDARD" });
   assert.match(standardInstructions, /VideoGen Pro/);
   assert.match(standardInstructions, /OPEN_UPGRADE/);
-  assert.match(standardInstructions, /AUTO branding/);
+  assert.match(standardInstructions, /AUTO account-default branding/);
 });
 
 void test("capability answers lead with workflow example prompts, not motion graphics", () => {
   const instructions = getServerInstructionsForHostSurface({ hostSurface: "CHATGPT_APP" });
-  assert.match(instructions, /compound interest works/);
-  assert.match(instructions, /3-scene vertical UGC ad for my new water bottle/);
-  assert.match(instructions, /Do not use a motion graphic, countdown/);
+  assert.match(instructions, /Before setup or capability answers, call get_getting_started_guidance/);
+  assert.match(instructions, /Use full style prompts from get_workflows_guidance/);
+
+  const [workflows] = getGuidanceDocuments({ hostSurface: "CHATGPT_APP" }).filter(
+    (doc) => doc.id === "workflows",
+  );
+  assert.ok(workflows != null);
+  assert.match(workflows.markdown, /\| Claymation \|/);
+  assert.match(workflows.markdown, /\| Watercolor \|/);
+  assert.match(workflows.markdown, /\| Realistic \| Photorealistic photograph, natural lighting \|/);
+  assert.match(workflows.markdown, /occupying only the middle half of the image/);
+  assert.match(workflows.markdown, /\| Name \| Prompt \|/);
+  assert.equal(workflows.markdown.includes("<!-- mcp-ai-style-examples -->"), false);
 
   const [gettingStarted] = getGuidanceDocuments({ hostSurface: "CHATGPT_APP" }).filter(
     (doc) => doc.id === "getting-started",
@@ -161,6 +168,20 @@ void test("capability answers lead with workflow example prompts, not motion gra
   );
   assert.ok(toolsVsWorkflows != null);
   assert.match(toolsVsWorkflows.markdown, /Do not open with `generate_motion_graphic`/);
+});
+
+void test("ChatGPT upload guidance does not offer tools that cannot see attachments", () => {
+  const [chatgpt] = getGuidanceDocuments({ hostSurface: "CHATGPT_APP" }).filter(
+    (doc) => doc.id === "getting-started",
+  );
+  const [standard] = getGuidanceDocuments({ hostSurface: "STANDARD" }).filter(
+    (doc) => doc.id === "getting-started",
+  );
+  assert.ok(chatgpt != null);
+  assert.ok(standard != null);
+  assert.match(chatgpt.markdown, /pass each attachment in `files`/);
+  assert.equal(chatgpt.markdown.includes("create_file_upload"), false);
+  assert.match(standard.markdown, /create_file_upload/);
 });
 
 void test("STANDARD getting-started credits guidance walks into upgrade deep links", () => {

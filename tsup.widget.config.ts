@@ -10,6 +10,7 @@ import { defineConfig } from "tsup";
  */
 export default defineConfig({
   entry: {
+    homeWidget: "web/homeEntry.tsx",
     uploadWidget: "web/uploadWidget.tsx",
     mediaPreviewWidget: "web/mediaPreviewWidget.tsx",
   },

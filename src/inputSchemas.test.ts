@@ -33,16 +33,28 @@ describe("storyboard_to_video input schema", () => {
           title: "Product reveal",
           durationSeconds: 5,
           voiceoverScript: "Meet your new everyday lip tint.",
+          productEntityIds: ["vg_enti_product"],
+          actorEntityIds: ["vg_enti_actor"],
+          visualStyleEntityId: "vg_enti_style",
         },
         {
           prompt: "A model applies the lip tint and smiles at camera.",
         },
       ],
+      productEntityIds: ["vg_enti_product"],
+      actorEntityIds: ["vg_enti_actor"],
       style: "premium beauty campaign",
       quality: "HIGH",
     });
 
     assert.equal(result.success, true);
+    if (result.success) {
+      assert.deepEqual(result.data.productEntityIds, ["vg_enti_product"]);
+      assert.deepEqual(result.data.actorEntityIds, ["vg_enti_actor"]);
+      assert.deepEqual(result.data.scenes[0]?.productEntityIds, ["vg_enti_product"]);
+      assert.deepEqual(result.data.scenes[0]?.actorEntityIds, ["vg_enti_actor"]);
+      assert.equal(result.data.scenes[0]?.visualStyleEntityId, "vg_enti_style");
+    }
   });
 
   it("rejects video-only quality tiers that the storyboard API does not accept", () => {

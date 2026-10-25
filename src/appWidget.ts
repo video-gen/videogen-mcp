@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildAppDeepLinkUrl } from "./appDeepLink";
 
 /**
  * The stable MCP resource URI for the ChatGPT App upload widget. Compatible
@@ -13,6 +14,8 @@ export const UPLOAD_WIDGET_URI = "ui://widget/videogen-upload.html";
  * videos, audio). Compatible updates may remain cached for up to one hour.
  */
 export const MEDIA_PREVIEW_WIDGET_URI = "ui://widget/videogen-media-preview.html";
+
+export const HOME_WIDGET_URI = "ui://widget/videogen-home.html";
 
 /**
  * The MCP Apps UI MIME type. A host only wires up the MCP Apps bridge (so
@@ -62,6 +65,8 @@ const MEDIA_RESOURCE_DOMAINS = [
   "https://storage-download-local.videogen-sandbox.io",
   // Cloudflare R2 — pre-signed object URLs
   "https://*.r2.cloudflarestorage.com",
+  // Cloudflare R2 — public stock-music bucket
+  "https://music.videogen.io",
   // Cloudflare R2 — public-preview bucket custom / r2.dev hosts
   "https://public-previews.videogen.io",
   "https://*.r2.dev",
@@ -74,12 +79,17 @@ const MEDIA_RESOURCE_DOMAINS = [
 
 /**
  * Content Security Policy for the upload widget iframe. `connectDomains` is the
- * ONLY network capability it needs: it PUTs file bytes directly to the
- * pre-signed storage URL from `create_file_upload` (Cloudflare R2). MCP tool
- * calls go through the host bridge, not a direct fetch.
+ * network capability it needs: PUTs to the pre-signed storage URL from
+ * `create_file_upload` (Cloudflare R2), and browser fetches of ChatGPT
+ * attachment bytes from `*.oaiusercontent.com`. The MCP server never fetches
+ * those attachment URLs. MCP tool calls go through the host bridge.
  */
 export const UPLOAD_WIDGET_CSP = {
-  connectDomains: ["https://*.r2.cloudflarestorage.com"],
+  connectDomains: [
+    "https://*.r2.cloudflarestorage.com",
+    "https://*.oaiusercontent.com",
+    "https://oaiusercontent.com",
+  ],
   resourceDomains: [] as string[],
   /**
    * ChatGPT-only: allowlist for `window.openai.openExternal` (safe-link skip).
@@ -185,6 +195,7 @@ const MEDIA_PREVIEW_WIDGET_ROOT_ID = "videogen-media-preview-root";
 
 let cachedUploadHtml: string | null = null;
 let cachedMediaPreviewHtml: string | null = null;
+let cachedHomeHtml: string | null = null;
 
 const readWidgetBundle = ({ bundleFileName }: { bundleFileName: string }): string => {
   const bundlePath = join(
@@ -193,7 +204,9 @@ const readWidgetBundle = ({ bundleFileName }: { bundleFileName: string }): strin
     bundleFileName,
   );
 
-  return readFileSync(bundlePath, "utf8");
+  // Source-based MCP tests/dev runs still consume the built browser bundle.
+  const sourceBuildPath = join(dirname(fileURLToPath(import.meta.url)), "..", "dist", "widget", bundleFileName);
+  return readFileSync(existsSync(bundlePath) ? bundlePath : sourceBuildPath, "utf8");
 };
 
 const buildWidgetHtml = ({
@@ -252,6 +265,17 @@ export function getMediaPreviewWidgetHtml(): string {
   });
 
   return cachedMediaPreviewHtml;
+}
+
+export function getHomeWidgetHtml(): string {
+  cachedHomeHtml ??= buildWidgetHtml({
+    rootId: "videogen-home-root",
+    bundleFileName: "homeWidget.global.js",
+  }).replace(
+    '<div id="videogen-home-root">',
+    `<div id="videogen-home-root" data-app-url="${new URL(buildAppDeepLinkUrl({ type: "NAVIGATE", destination: "HOME" })).origin}">`,
+  );
+  return cachedHomeHtml;
 }
 
 /** Tool `_meta` that tells ChatGPT / MCP Apps hosts to render the media preview. */

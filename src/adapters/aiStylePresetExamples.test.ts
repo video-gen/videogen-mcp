@@ -5,6 +5,7 @@ import {
   MCP_AI_STYLE_COMPOSITION_LOCK,
   MCP_AI_STYLE_FIELD_DESCRIPTION,
   MCP_AI_STYLE_PRESET_EXAMPLES,
+  formatMcpAiStylePresetExamplesMarkdown,
 } from "./aiStylePresetExamples";
 
 describe("MCP AI style preset examples", () => {
@@ -19,5 +20,11 @@ describe("MCP AI style preset examples", () => {
       /occupying only the middle half of the image/,
     );
     assert.ok(MCP_AI_STYLE_FIELD_DESCRIPTION.includes(MCP_AI_STYLE_COMPOSITION_LOCK));
+
+    const table = formatMcpAiStylePresetExamplesMarkdown();
+    assert.match(table, /\| Name \| Prompt \|/);
+    for (const example of MCP_AI_STYLE_PRESET_EXAMPLES) {
+      assert.ok(table.includes(`| ${example.name} | ${example.prompt} |`));
+    }
   });
 });
