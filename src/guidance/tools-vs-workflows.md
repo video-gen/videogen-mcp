@@ -13,10 +13,10 @@ Ask what “done” looks like for the user.
 ### Use a workflow when
 
 - They want a **multi-scene, narrated, professionally assembled video**
-- They need an **editable project** they can remix and export to MP4
+- They need an **editable project** they can edit and export to MP4
 - Input is a **script**, **voiceover file**, **slideshow**, **storyboard**, **short prompt-as-project clip**, or an **existing video to restyle**
 
-Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`). Wait until `succeeded` and give the user `downloadUrl` (auto-export is on by default). Details: `get_workflows_guidance`.
+Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`, `translate_video`). Wait until `succeeded` and give the user `downloadUrl` (auto-export is on by default). Details: `get_workflows_guidance`.
 
 **Which workflow?** For ~1 minute+ narrated / informational / news-style videos from text, prefer **`script_to_video`**. Use **`storyboard_to_video`** only for short, shot-directed spots, and **never more than 3 scenes** unless the user explicitly asks for more (storyboard is much more credit-heavy per scene). If the user has not named a workflow, **ask** with a short pros/cons (script vs storyboard) before starting.
 
@@ -26,14 +26,14 @@ Call the matching workflow tool (`script_to_video`, `voiceover_to_video`, `slide
 - They want a **transform**: upscale, remove background, vectorize, 3D effect
 - They will **assemble elsewhere** or only need the asset file id / download URL
 
-Call tools such as `generate_image`, `generate_video_clip`, `text_to_speech`, `generate_sound_effect`, `generate_music`, `generate_avatar`, `generate_motion_graphic`, `vectorize_image`, `remove_image_background`, `remove_video_background`, `upscale_image`, `upscale_video`, `image_3d_effect`.
+Call tools such as `generate_image`, `generate_video_clip`, `text_to_speech`, `generate_sound_effect`, `generate_music`, `generate_avatar`, `generate_motion_graphic`, `vectorize_image`, `remove_image_background`, `remove_video_background`, `upscale_image`, `upscale_video`, `dub_video`, `image_3d_effect`.
 
 ### Borderline: short clip
 
-| Intent | Prefer |
-| --- | --- |
-| Standalone short clip, no editor project | `generate_video_clip` |
-| Short clip that should live in a VideoGen project (remix/export later) | `prompt_to_video_clip` |
+| Intent                                                                | Prefer                 |
+| --------------------------------------------------------------------- | ---------------------- |
+| Standalone short clip, no editor project                              | `generate_video_clip`  |
+| Short clip that should live in a VideoGen project (edit/export later) | `prompt_to_video_clip` |
 
 Both routes automatically pick a suitable generation model for the inputs and settings. **You do not choose an upstream model name.** Describe the creative intent (`prompt`, `style`, quality, duration) and let VideoGen route.
 
@@ -62,7 +62,7 @@ Workflows go further: they orchestrate script/timing, visuals, narration, captio
 ### Transform
 
 - `vectorize_image`, `remove_image_background`, `remove_video_background`
-- `upscale_image`, `upscale_video`, `image_3d_effect`
+- `upscale_image`, `upscale_video`, `dub_video`, `image_3d_effect`
 
 ### Run lifecycle
 
@@ -74,27 +74,28 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 
 ## Workflows catalog (MCP)
 
-- `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`
+- `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`, `translate_video`
 - `list_workflow_runs`, `get_workflow_run`, `cancel_workflow_run`
-- Then wait for `succeeded` and use `downloadUrl` (default auto-export). Set `autoExport: false` only if you need `remix_project` before `export_project`.
+- Then wait for `succeeded` and use `downloadUrl` (default auto-export). Set `autoExport: false` only if you need `start_video_edits` before `export_project`.
 
 ---
 
 ## Decision examples
 
-| User says | Do this |
-| --- | --- |
-| “What can VideoGen do?” | Lead with finished-video workflows and pretty prompts such as “Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover” or “Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end”. Do not open with `generate_motion_graphic` or a countdown. |
-| “Make a 60s explainer from this script” | `script_to_video` (default auto-export) → give the user `downloadUrl` |
-| “Make a ~1 minute 16:9 video about a product launch” (no workflow named) | Ask script vs storyboard (pros/cons); default recommendation **`script_to_video`** |
-| “Storyboard three hero shots of the bottle” | `storyboard_to_video` with ≤ 3 scenes. If a PRODUCT entity exists, put its id in each scene's `productEntityIds` |
-| “Generate a hero image of a blue bottle” | `generate_image` |
-| “Turn this MP3 into a video with b-roll” | upload → `voiceover_to_video` → `downloadUrl` |
-| “One 8-second product teaser, just the clip file” | `generate_video_clip` |
-| “Make this product video look like claymation” (with a link or an uploaded video) | `video_to_video` with `videoUrl` or `videoFileId` |
-| “Add captions and a Ken Burns zoom on my project” | `remix_project` with `CAPTIONS` and `ZOOM` |
-| “Turn the stills into generated video clips” | `remix_project` with `CONVERT_IMAGES_TO_VIDEOS` (expensive; confirm first) |
-| “Remove the background from this PNG” | upload → `remove_image_background` |
+| User says                                                                         | Do this                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| “What can VideoGen do?”                                                           | Lead with finished-video workflows and pretty prompts such as “Make a one-minute 16:9 video explaining how compound interest works, with cinematic visuals and an energetic voiceover” or “Make a 3-scene vertical UGC ad for my new water bottle, with handheld phone energy, a punchy voiceover, and a clear call to action at the end”. Do not open with `generate_motion_graphic` or a countdown. |
+| “Make a 60s explainer from this script”                                           | `script_to_video` (default auto-export) → give the user `downloadUrl`                                                                                                                                                                                                                                                                                                                                 |
+| “Make a ~1 minute 16:9 video about a product launch” (no workflow named)          | Ask script vs storyboard (pros/cons); default recommendation **`script_to_video`**                                                                                                                                                                                                                                                                                                                    |
+| “Storyboard three hero shots of the bottle”                                       | `storyboard_to_video` with ≤ 3 scenes. If a PRODUCT entity exists, put its id in each scene's `productEntityIds`                                                                                                                                                                                                                                                                                      |
+| “Generate a hero image of a blue bottle”                                          | `generate_image`                                                                                                                                                                                                                                                                                                                                                                                      |
+| “Turn this MP3 into a video with b-roll”                                          | upload → `voiceover_to_video` → `downloadUrl`                                                                                                                                                                                                                                                                                                                                                         |
+| “One 8-second product teaser, just the clip file”                                 | `generate_video_clip`                                                                                                                                                                                                                                                                                                                                                                                 |
+| “Make this product video look like claymation” (with a link or an uploaded video) | `video_to_video` with `videoUrl` or `videoFileId`                                                                                                                                                                                                                                                                                                                                                     |
+| “Translate this video into Spanish and French” (uploaded video)                   | `translate_video` with `videoFileId` and `outputLanguages`; `dub_video` for one standalone file                                                                                                                                                                                                                                                                                                       |
+| “Add captions and a Ken Burns zoom on my project”                                 | `start_video_edits` with `ENABLE_CAPTIONS` and `ADD_ZOOM` video edits                                                                                                                                                                                                                                                                                                                                 |
+| “Turn the stills into generated video clips”                                      | `start_video_edits` with `CONVERT_IMAGES_TO_VIDEOS` (expensive; confirm first)                                                                                                                                                                                                                                                                                                                        |
+| “Remove the background from this PNG”                                             | upload → `remove_image_background`                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -103,5 +104,5 @@ Async behavior matches workflows: start returns an id; poll on hosted with `get_
 1. **Chaining five media tools** to fake a full video when `script_to_video` exists.
 2. **Starting `script_to_video`** when the user only asked for a stock-style still or one SFX.
 3. **Naming internal AI vendors** to the user. Stay on VideoGen concepts: tools, workflows, quality, style.
-4. **Forgetting `downloadUrl`.** With default auto-export, a succeeded workflow includes the MP4 URL. Only use `export_project` when you set `autoExport: false` (for remix-first).
+4. **Forgetting `downloadUrl`.** With default auto-export, a succeeded workflow includes the MP4 URL. Only use `export_project` when you set `autoExport: false` (for edit-first).
 5. **Running a long `storyboard_to_video`** (many scenes) for an informational / ~1 minute brief. Prefer `script_to_video`, or ask first; cap storyboard at 3 scenes unless the user insists.

@@ -1,116 +1,150 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  createHomeBridge,
-  getSafeHomeLink,
-  readHomeProjects,
-} from "../web/homeBridge.ts";
+import { createHomeBridge } from "../web/homeBridge.ts";
 
-function installHost(context, handle) {
+test("wrapper accepts only trusted host replies and typed app context without redirecting app actions", (context) => {
   const surface = new EventTarget();
   const messages = [];
-  const parent = {
-    postMessage(message) {
-      messages.push(message);
-      if (message.id == null) return;
-      queueMicrotask(() => handle(message, reply));
-    },
-  };
-  function reply(id, result, source = parent) {
-    const event = new Event("message");
-    Object.defineProperties(event, {
-      source: { value: source },
-      data: { value: { jsonrpc: "2.0", id, result } },
-    });
-    surface.dispatchEvent(event);
-  }
+  const parent = { postMessage: (message) => messages.push(message) };
   Object.defineProperty(surface, "parent", { value: parent });
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
-  Object.defineProperty(globalThis, "window", {
-    value: surface,
-    configurable: true,
-  });
+  Object.defineProperty(globalThis, "window", { value: surface, configurable: true });
   context.after(() => {
     if (descriptor == null) Reflect.deleteProperty(globalThis, "window");
     else Object.defineProperty(globalThis, "window", descriptor);
   });
-  return { messages, reply };
-}
-
-test("home initializes MCP Apps before reading projects and sends only on submit", async (context) => {
-  const { messages } = installHost(context, (message, reply) => {
-    if (message.method === "ui/initialize")
-      reply(message.id, { protocolVersion: "2026-01-26" });
-    else if (message.method === "tools/call")
-      reply(message.id, { structuredContent: { projects: [] } });
-    else if (message.method === "ui/message") reply(message.id, {});
-  });
-  const bridge = createHomeBridge();
+  const appMessages = [];
+  const appWindow = { postMessage: (...args) => appMessages.push(args) };
+  let appConnected = true;
+  const bridge = createHomeBridge({ appOrigin: "https://app.videogen.io", getAppWindow: () => appConnected ? appWindow : null });
   context.after(() => bridge.dispose());
-  assert.deepEqual(
-    readHomeProjects(await bridge.callTool("list_projects", { limit: 8 })),
-    [],
-  );
-  assert.deepEqual(
-    messages.map((message) => message.method),
-    ["ui/initialize", "ui/notifications/initialized", "tools/call"],
-  );
-  assert.equal(
-    await bridge.sendMessage("Make an explainer about gravity"),
-    true,
-  );
-  assert.deepEqual(messages.at(-1).params, {
-    role: "user",
-    content: [{ type: "text", text: "Make an explainer about gravity" }],
-  });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].method, "ui/initialize");
+  assert.deepEqual(messages[0].params.appCapabilities, { availableDisplayModes: ["fullscreen"] });
+  function dispatch(source, data, origin = "https://chatgpt.com") {
+    const event = new Event("message");
+    Object.defineProperties(event, { source: { value: source }, data: { value: data }, origin: { value: origin } });
+    surface.dispatchEvent(event);
+  }
+  const ready = { type: "videogen:context-ready" };
+  dispatch({}, ready, "https://app.videogen.io");
+  dispatch(appWindow, ready, "https://attacker.example");
+  assert.equal(appMessages.length, 0);
+  dispatch(appWindow, ready, "https://app.videogen.io");
+  assert.deepEqual(appMessages, [[{ type: "videogen:request-context" }, "https://app.videogen.io"]]);
+  assert.equal(messages.length, 1);
+  const response = { jsonrpc: "2.0", id: messages[0].id, result: {} };
+  dispatch({}, response);
+  dispatch({}, { jsonrpc: "2.0", method: "tools/call", params: { name: "export_project" } });
+  assert.equal(messages.length, 1);
+  dispatch(parent, { ...response, id: "wrong-id" });
+  assert.equal(messages.length, 1);
+  dispatch(parent, response);
+  assert.equal(messages.length, 2);
+  assert.equal(messages[1].method, "ui/notifications/initialized");
+  dispatch(parent, response);
+  assert.equal(messages.length, 2);
+  const projectId = "11111111-1111-4111-8111-111111111111";
+  const selection = { type: "videogen:project-context", projectId };
+  dispatch(appWindow, selection, "https://attacker.example");
+  dispatch({}, selection, "https://app.videogen.io");
+  dispatch(appWindow, { ...selection, projectId: "arbitrary prompt text" }, "https://app.videogen.io");
+  assert.equal(messages.length, 2);
+  dispatch(appWindow, selection, "https://app.videogen.io");
+  assert.equal(messages.at(-1).method, "ui/update-model-context");
+  assert.deepEqual(messages.at(-1).params, { structuredContent: { videogen: { projectId } } });
+  dispatch(appWindow, { ...selection, projectId: null }, "https://app.videogen.io");
+  assert.deepEqual(messages.at(-1).params.structuredContent, { videogen: { projectId: null } });
+  const beforeOverlayMove = messages.length;
+  const appMessagesBeforeOverlayMove = appMessages.length;
+  dispatch(parent, { jsonrpc: "2.0", method: "ui/notifications/host-context-changed", params: { safeAreaInsets: { top: 8, right: 0, bottom: 36, left: 0 } } });
+  assert.equal(messages.length, beforeOverlayMove);
+  assert.equal(appMessages.length, appMessagesBeforeOverlayMove);
+  assert.deepEqual(appMessages[0], [{ type: "videogen:request-context" }, "https://app.videogen.io"]);
+  const requestId = "22222222-2222-4222-8222-222222222222";
+  const send = { type: "videogen:send-message", requestId, prompt: "Create a product ad" };
+  const beforeSend = messages.length;
+  dispatch({}, send, "https://app.videogen.io");
+  dispatch(appWindow, send, "https://attacker.example");
+  assert.equal(messages.length, beforeSend);
+  dispatch(appWindow, send, "https://app.videogen.io");
+  assert.equal(messages.length, beforeSend);
+  assert.equal(messages.some((message) => message.method === "ui/message"), false);
+  const countBeforeDisconnect = messages.length;
+  appConnected = false;
+  dispatch(null, selection, "https://app.videogen.io");
+  assert.equal(messages.length, countBeforeDisconnect);
 });
 
-test("home rejects messages from other frames and reports failed sends", async (context) => {
-  installHost(context, (message, reply) => {
-    reply(message.id, { structuredContent: { projects: [] } }, {});
-    if (message.method === "ui/initialize") reply(message.id, {});
-    else if (message.method === "ui/message")
-      reply(message.id, { isError: true });
+
+test("external sign-in uses only a fixed first-party page and handles host acceptance, rejection and cancellation", (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const surface = new EventTarget();
+  const hostMessages = [];
+  const parent = { postMessage: message => hostMessages.push(message) };
+  Object.defineProperty(surface, "parent", { value: parent });
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { value: surface, configurable: true });
+  context.after(() => {
+    if (descriptor == null) Reflect.deleteProperty(globalThis, "window");
+    else Object.defineProperty(globalThis, "window", descriptor);
   });
-  const bridge = createHomeBridge();
+  const appMessages = [];
+  const appWindow = { postMessage: (...args) => appMessages.push(args) };
+  const bridge = createHomeBridge({ appOrigin: "https://app.videogen.io", getAppWindow: () => appWindow });
   context.after(() => bridge.dispose());
-  assert.equal(await bridge.sendMessage("Keep this draft"), false);
+  function dispatch(source, data, origin = "https://app.videogen.io") {
+    const event = new Event("message");
+    Object.defineProperties(event, { source: { value: source }, data: { value: data }, origin: { value: origin } });
+    surface.dispatchEvent(event);
+  }
+  dispatch(parent, { jsonrpc: "2.0", id: hostMessages[0].id, result: {} }, "https://chatgpt.com");
+  const requestId = "11111111-1111-4111-8111-111111111111";
+  const open = { type: "videogen:open-google-signin", requestId, href: "https://app.videogen.io/chatgpt/google-start#authorize=encoded-request" };
+  const countLinks = () => hostMessages.filter(message => message.method === "ui/open-link").length;
+  dispatch({}, open);
+  dispatch(appWindow, open, "https://attacker.example");
+  for (const href of ["https://attacker.example/chatgpt/google-start#authorize=x", "https://app.videogen.io/settings#authorize=x", "https://app.videogen.io/chatgpt/google-start"]) dispatch(appWindow, { ...open, href });
+  assert.equal(countLinks(), 0);
+  dispatch(appWindow, open);
+  assert.equal(countLinks(), 1);
+  const navigation = hostMessages.at(-1);
+  assert.deepEqual(navigation.params, { url: open.href });
+  dispatch(appWindow, open);
+  assert.equal(countLinks(), 1);
+  dispatch({}, { jsonrpc: "2.0", id: navigation.id, result: {} }, "https://chatgpt.com");
+  dispatch(parent, { jsonrpc: "2.0", id: navigation.id, result: { isError: true } }, "https://chatgpt.com");
+  assert.deepEqual(appMessages.at(-1), [{ type: "videogen:google-signin-opened", requestId, opened: false }, "https://app.videogen.io"]);
+  dispatch(appWindow, open);
+  dispatch(parent, { jsonrpc: "2.0", id: hostMessages.at(-1).id, result: {} }, "https://chatgpt.com");
+  assert.deepEqual(appMessages.at(-1), [{ type: "videogen:google-signin-opened", requestId, opened: true }, "https://app.videogen.io"]);
+  dispatch(appWindow, open);
+  context.mock.timers.tick(12_000);
+  assert.equal(appMessages.at(-1)[0].opened, false);
+  dispatch(appWindow, open);
+  const lateId = hostMessages.at(-1).id;
+  dispatch(appWindow, { type: "videogen:cancel-google-signin-open", requestId });
+  const beforeLateReply = appMessages.length;
+  dispatch(parent, { jsonrpc: "2.0", id: lateId, result: {} }, "https://chatgpt.com");
+  assert.equal(appMessages.length, beforeLateReply);
+  assert.equal(hostMessages.some(message => message.method === "ui/update-model-context" || message.method === "ui/message"), false);
 });
 
-test("home rejects malformed project data and external navigation", () => {
-  const project = {
-    projectId: "vg_proj_test",
-    title: "My video",
-    projectUrl: "https://app.videogen.io/project/test",
-  };
-  assert.deepEqual(
-    readHomeProjects({ structuredContent: { projects: [project, null, {}] } }),
-    null,
-  );
-  assert.equal(
-    readHomeProjects({ isError: true, structuredContent: { projects: [] } }),
-    null,
-  );
-  assert.equal(
-    readHomeProjects({ content: [{ text: "Sign in to continue" }] }),
-    null,
-  );
-  assert.deepEqual(
-    readHomeProjects({
-      content: [{ text: JSON.stringify({ projects: [project] }) }],
-    }),
-    [project],
-  );
-  assert.equal(
-    getSafeHomeLink("/projects", "https://dev.app.videogen.io"),
-    "https://dev.app.videogen.io/projects",
-  );
-  assert.equal(
-    getSafeHomeLink("https://attacker.example", "https://app.videogen.io"),
-    null,
-  );
-  assert.equal(
-    getSafeHomeLink("javascript:alert(1)", "https://app.videogen.io"),
-    null,
-  );
+test("Open in app registers before initialization and after delayed host globals, then cleans up", (context) => {
+  const surface = new EventTarget();
+  Object.defineProperty(surface, "parent", { value: { postMessage() {} } });
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { value: surface, configurable: true });
+  context.after(() => {
+    if (descriptor == null) Reflect.deleteProperty(globalThis, "window");
+    else Object.defineProperty(globalThis, "window", descriptor);
+  });
+  const bridge = createHomeBridge({ appOrigin: "https://prerelease.app.videogen.io", getAppWindow: () => null });
+  const destinations = [];
+  Object.defineProperty(surface, "openai", { value: { setOpenInAppUrl: (target) => destinations.push(target) } });
+  surface.dispatchEvent(new Event("openai:set_globals"));
+  assert.deepEqual(destinations, [{ href: "https://prerelease.app.videogen.io" }]);
+  bridge.dispose();
+  surface.dispatchEvent(new Event("openai:set_globals"));
+  assert.equal(destinations.length, 1);
 });

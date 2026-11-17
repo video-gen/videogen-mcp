@@ -34,6 +34,7 @@ export function toExportProjectRequest(input: ExportProjectInput): ExportProject
     watermarkMode: "AUTO",
     endScreenMode: "AUTO",
     ...(input.quality != null && { quality: input.quality }),
+    ...(input.editableVideoId != null && { editableVideoId: input.editableVideoId }),
   };
 }
 
@@ -41,5 +42,6 @@ export function toRemixProjectRequest(input: RemixProjectInput): RemixProjectReq
   return {
     remixActions: input.edits.map(remixEditToAction),
     ...(input.saveAsNewProject != null && { saveAsNewProject: input.saveAsNewProject }),
+    ...(input.editableVideoId != null && { editableVideoId: input.editableVideoId }),
   };
 }

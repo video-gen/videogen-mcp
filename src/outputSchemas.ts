@@ -27,7 +27,10 @@ const apiErrorSchema = z
       .passthrough()
       .nullish()
       .describe("What is needed to resolve the error, when applicable."),
-    internalErrorCode: z.string().nullish().describe("Opaque code for support."),
+    internalErrorCode: z
+      .string()
+      .nullish()
+      .describe("Opaque code for support."),
   })
   .passthrough()
   .nullable()
@@ -39,7 +42,9 @@ const jobStatusSchema = z
 
 const fileSourceSchema = z
   .object({
-    status: z.enum(["pending", "ready", "failed", "skipped"]).describe("Rendition status."),
+    status: z
+      .enum(["pending", "ready", "failed", "skipped"])
+      .describe("Rendition status."),
     url: z.string().nullish().describe("Signed URL when status is ready."),
     expiresAt: z.number().nullish().describe("Unix expiry for url."),
     width: z.number().nullish().describe("Rendition width in pixels."),
@@ -56,22 +61,43 @@ const fileSourceSchema = z
 const fileInfoSchema = z
   .object({
     fileId: z.string().describe("File id (vg_file_...)."),
-    type: z.string().nullish().describe("File type once processing has determined it."),
+    type: z
+      .string()
+      .nullish()
+      .describe("File type once processing has determined it."),
     scope: z
       .enum(["GLOBAL", "PROJECT", "EXPORT", "TEMPORARY", "ENTITY"])
       .optional()
       .describe("File scope."),
     displayName: z.string().optional().describe("Display name for the file."),
-    description: z.string().nullish().describe("File description when analyzed."),
+    description: z
+      .string()
+      .nullish()
+      .describe("File description when analyzed."),
     durationSeconds: z
       .number()
       .nullish()
       .describe("Duration in seconds for video/audio; null for images."),
-    transcriptText: z.string().nullish().describe("Plain transcript text when available."),
-    downloadUrl: z.string().nullish().describe("Signed download URL when ready."),
-    downloadUrlExpiresAt: z.number().nullish().describe("Unix expiry for downloadUrl."),
-    thumbnailUrl: z.string().nullish().describe("Signed thumbnail URL when available."),
-    thumbnailUrlExpiresAt: z.number().nullish().describe("Unix expiry for thumbnailUrl."),
+    transcriptText: z
+      .string()
+      .nullish()
+      .describe("Plain transcript text when available."),
+    downloadUrl: z
+      .string()
+      .nullish()
+      .describe("Signed download URL when ready."),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullish()
+      .describe("Unix expiry for downloadUrl."),
+    thumbnailUrl: z
+      .string()
+      .nullish()
+      .describe("Signed thumbnail URL when available."),
+    thumbnailUrlExpiresAt: z
+      .number()
+      .nullish()
+      .describe("Unix expiry for thumbnailUrl."),
     thumbnailSource: fileSourceSchema.nullish(),
     previewSource: fileSourceSchema.nullish(),
     downloadSource: fileSourceSchema.nullish(),
@@ -90,8 +116,12 @@ const remixActionRunSchema = z
     remixActionId: z.string().describe("Remix action id (vg_rmix_...)."),
     type: z.string().describe("Remix action type (e.g. ENABLE_CAPTIONS)."),
     status: jobStatusSchema,
-    projectId: z.string().describe("Project this remix action edits (vg_proj_...)."),
-    projectUrl: z.string().describe("Deep link to the project in the VideoGen editor."),
+    projectId: z
+      .string()
+      .describe("Project this remix action edits (vg_proj_...)."),
+    projectUrl: z
+      .string()
+      .describe("Deep link to the project in the VideoGen editor."),
     progressPercentage: z.number().describe("Completion progress 0-100."),
     attemptIndex: z.number().describe("Current or latest attempt index."),
     error: apiErrorSchema,
@@ -104,9 +134,18 @@ const toolSuccessResultSchema = z
     fileId: z.string().describe("Generated file id (vg_file_...)."),
     type: z.string().describe("Generated file type."),
     downloadUrl: z.string().nullable().describe("Signed download URL."),
-    downloadUrlExpiresAt: z.number().nullable().describe("Unix expiry for downloadUrl."),
-    thumbnailUrl: z.string().nullable().describe("Signed thumbnail URL, or null."),
-    thumbnailUrlExpiresAt: z.number().nullable().describe("Unix expiry for thumbnailUrl."),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullable()
+      .describe("Unix expiry for downloadUrl."),
+    thumbnailUrl: z
+      .string()
+      .nullable()
+      .describe("Signed thumbnail URL, or null."),
+    thumbnailUrlExpiresAt: z
+      .number()
+      .nullable()
+      .describe("Unix expiry for thumbnailUrl."),
     file: fileInfoSchema.describe("Hydrated file metadata."),
   })
   .passthrough()
@@ -119,7 +158,9 @@ const executedToolSchema = z
     toolType: z.string().describe("Tool name (e.g. GENERATE_IMAGE)."),
     progressPercentage: z.number().describe("Completion progress 0-100."),
     attemptIndex: z.number().describe("Current or latest attempt index."),
-    results: z.array(toolSuccessResultSchema).describe("Generated results; empty until succeeded."),
+    results: z
+      .array(toolSuccessResultSchema)
+      .describe("Generated results; empty until succeeded."),
     error: apiErrorSchema,
   })
   .passthrough()
@@ -133,8 +174,12 @@ const workflowRunSchema = z
     workflowType: z.string().describe("Workflow type."),
     progressPercentage: z.number().describe("Completion progress 0-100."),
     attemptIndex: z.number().describe("Current or latest attempt index."),
-    projectId: z.string().describe("Project created for this run (vg_proj_...)."),
-    projectUrl: z.string().describe("Deep link to the project in the VideoGen editor."),
+    projectId: z
+      .string()
+      .describe("Project created for this run (vg_proj_...)."),
+    projectUrl: z
+      .string()
+      .describe("Deep link to the project in the VideoGen editor."),
     error: apiErrorSchema,
     exportId: z
       .string()
@@ -145,8 +190,14 @@ const workflowRunSchema = z
       .string()
       .nullable()
       .optional()
-      .describe("Signed MP4 download URL when autoExport succeeded. Give this to the user."),
-    downloadUrlExpiresAt: z.number().nullable().optional().describe("Unix expiry for downloadUrl."),
+      .describe(
+        "Signed MP4 download URL when autoExport succeeded. Give this to the user.",
+      ),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Unix expiry for downloadUrl."),
     exportFileId: z
       .string()
       .nullable()
@@ -171,13 +222,19 @@ const ttsVoiceSchema = z
     voiceId: z.string().describe("Voice id (vg_voic_...)."),
     languageCode: z.string().describe("Locale tag (e.g. en-US)."),
     displayName: z.string().describe("Human-readable voice name."),
-    displayGender: z.enum(["MALE", "FEMALE", "NEUTRAL"]).describe("Voice gender."),
+    displayGender: z
+      .enum(["MALE", "FEMALE", "NEUTRAL"])
+      .describe("Voice gender."),
     accent: z.string().nullish().describe("Accent label, when set."),
     description: z.string().nullish().describe("Voice description."),
     supportsDirectToolExecution: z
       .boolean()
-      .describe("Whether the voice can be used with text_to_speech directly."),
-    supportsAllLanguages: z.boolean().describe("Whether the voice can speak any language."),
+      .describe(
+        "Always true. All catalog voices support text_to_speech directly. Retained for compatibility.",
+      ),
+    supportsAllLanguages: z
+      .boolean()
+      .describe("Whether the voice can speak any language."),
     isDeprecated: z.boolean().describe("Whether the voice is deprecated."),
   })
   .passthrough()
@@ -196,7 +253,10 @@ export const meOutputSchema = z
     apiKeyId: z.string().describe("Id of the API key used for this request."),
     apiKeyNickname: z.string().describe("Nickname of the API key."),
     email: z.string().describe("Account email."),
-    displayName: z.string().nullable().describe("Account display name, or null."),
+    displayName: z
+      .string()
+      .nullable()
+      .describe("Account display name, or null."),
     teamId: z.string().describe("Team id the API key belongs to."),
   })
   .passthrough()
@@ -210,10 +270,20 @@ export const projectOutputSchema = z
       .nullable()
       .describe("Assistant conversation id, or null for older projects."),
     title: z.string().describe("Project title."),
-    status: z.enum(["generating", "ready"]).describe("High-level project status."),
-    projectUrl: z.string().describe("Deep link to open the project in the VideoGen editor."),
-    createdAt: z.number().describe("Unix timestamp when the project was created."),
-    updatedAt: z.number().describe("Unix timestamp when the project was last updated."),
+    status: z
+      .enum(["generating", "ready", "failed", "cancelled"])
+      .describe(
+        "High-level project status; failed and cancelled generations are not still generating.",
+      ),
+    projectUrl: z
+      .string()
+      .describe("Deep link to open the project in the VideoGen editor."),
+    createdAt: z
+      .number()
+      .describe("Unix timestamp when the project was created."),
+    updatedAt: z
+      .number()
+      .describe("Unix timestamp when the project was last updated."),
     aspectRatio: aspectRatioSchema,
   })
   .passthrough()
@@ -221,7 +291,9 @@ export const projectOutputSchema = z
 
 export const listProjectsOutputSchema = z
   .object({
-    projects: z.array(projectOutputSchema).describe("Projects, most recently updated first."),
+    projects: z
+      .array(projectOutputSchema)
+      .describe("Projects, most recently updated first."),
     hasMore: z.boolean().describe("Whether another page is available."),
     nextCursor: z
       .string()
@@ -238,27 +310,48 @@ export const listProjectsOutputSchema = z
 export const exportProjectOutputSchema = z
   .object({
     exportId: z.string().describe("Export id (vg_expo_...)."),
-    projectId: z.string().optional().describe("Exported project id (present after polling)."),
+    projectId: z
+      .string()
+      .optional()
+      .describe("Exported project id (present after polling)."),
     status: jobStatusSchema.optional(),
     progressPercentage: z
       .number()
       .optional()
       .describe("Completion progress 0-100 (present after polling)."),
-    attemptIndex: z.number().optional().describe("Current or latest attempt index."),
+    attemptIndex: z
+      .number()
+      .optional()
+      .describe("Current or latest attempt index."),
     downloadUrl: z
       .string()
       .nullable()
       .optional()
       .describe("Signed MP4 download URL when succeeded; otherwise null."),
-    downloadUrlExpiresAt: z.number().nullable().optional().describe("Unix expiry for downloadUrl."),
-    thumbnailUrl: z.string().nullable().optional().describe("Signed thumbnail URL when ready."),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Unix expiry for downloadUrl."),
+    thumbnailUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Signed thumbnail URL when ready."),
     thumbnailUrlExpiresAt: z
       .number()
       .nullable()
       .optional()
       .describe("Unix expiry for thumbnailUrl."),
-    exportFileId: z.string().nullable().optional().describe("Exported MP4 file id when succeeded."),
-    file: fileInfoSchema.nullable().optional().describe("Hydrated export file metadata."),
+    exportFileId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Exported MP4 file id when succeeded."),
+    file: fileInfoSchema
+      .nullable()
+      .optional()
+      .describe("Hydrated export file metadata."),
     error: apiErrorSchema.optional(),
   })
   .passthrough()
@@ -271,8 +364,12 @@ export const projectExportOutputSchema = exportProjectOutputSchema;
 
 export const remixProjectOutputSchema = z
   .object({
-    projectId: z.string().describe("Edited project id (or the duplicate when saveAsNewProject)."),
-    projectUrl: z.string().describe("Deep link to the project in the VideoGen editor."),
+    projectId: z
+      .string()
+      .describe("Edited project id (or the duplicate when saveAsNewProject)."),
+    projectUrl: z
+      .string()
+      .describe("Deep link to the project in the VideoGen editor."),
     remixActionIds: z
       .array(z.string())
       .describe("Remix action ids, one per requested action in order."),
@@ -282,9 +379,14 @@ export const remixProjectOutputSchema = z
 
 export const listRemixActionsOutputSchema = z
   .object({
-    remixActions: z.array(remixActionRunSchema).describe("Remix actions for the project."),
+    remixActions: z
+      .array(remixActionRunSchema)
+      .describe("Remix actions for the project."),
     hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+    nextCursor: z
+      .string()
+      .nullable()
+      .describe("Cursor for the next page, or null."),
   })
   .passthrough()
   .describe("Paginated remix-action status list.");
@@ -310,17 +412,25 @@ export const workflowRunOutputSchema = z
       .describe(
         "Deep link to the project created for this exact workflow attempt. Keep it paired with workflowRunId; a retry returns a new URL.",
       ),
-    remixActionIds: z
+    videoEditIds: z
       .array(z.string())
       .optional()
-      .describe("Remix action ids from the start response (empty when none requested)."),
+      .describe(
+        "Video edit ids from the start response (empty when none requested).",
+      ),
     status: jobStatusSchema.optional(),
-    workflowType: z.string().optional().describe("Workflow type (present after polling)."),
+    workflowType: z
+      .string()
+      .optional()
+      .describe("Workflow type (present after polling)."),
     progressPercentage: z
       .number()
       .optional()
       .describe("Completion progress 0-100 (present after polling)."),
-    attemptIndex: z.number().optional().describe("Current or latest attempt index."),
+    attemptIndex: z
+      .number()
+      .optional()
+      .describe("Current or latest attempt index."),
     error: apiErrorSchema.optional(),
     exportId: z
       .string()
@@ -331,13 +441,45 @@ export const workflowRunOutputSchema = z
       .string()
       .nullable()
       .optional()
-      .describe("Signed MP4 download URL when autoExport succeeded. Give this to the user."),
-    downloadUrlExpiresAt: z.number().nullable().optional().describe("Unix expiry for downloadUrl."),
+      .describe(
+        "Signed MP4 download URL when autoExport succeeded. Give this to the user.",
+      ),
+    downloadUrlExpiresAt: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Unix expiry for downloadUrl."),
     exportFileId: z
       .string()
       .nullable()
       .optional()
       .describe("File id of the rendered MP4 when autoExport succeeded."),
+    outputs: z
+      .array(
+        z
+          .object({
+            editableVideoId: z
+              .string()
+              .nullable()
+              .describe(
+                "Editable video id (vg_vide_...) to pass to export_project or remix_project. Null when this output failed.",
+              ),
+            language: z
+              .string()
+              .nullable()
+              .describe(
+                "Language of this output for translate_video runs, otherwise null.",
+              ),
+            status: z
+              .enum(["succeeded", "failed"])
+              .describe("Whether this output was produced."),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .describe(
+        "Editable videos the run produced, one per language for translate_video. Empty until the run's output is ready.",
+      ),
   })
   .passthrough()
   .describe(
@@ -346,9 +488,14 @@ export const workflowRunOutputSchema = z
 
 export const listWorkflowRunsOutputSchema = z
   .object({
-    workflowRuns: z.array(workflowRunSchema).describe("Workflow runs, most recent first."),
+    workflowRuns: z
+      .array(workflowRunSchema)
+      .describe("Workflow runs, most recent first."),
     hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+    nextCursor: z
+      .string()
+      .nullable()
+      .describe("Cursor for the next page, or null."),
   })
   .passthrough()
   .describe("Paginated list of workflow runs.");
@@ -361,12 +508,18 @@ export const toolExecutionOutputSchema = z
   .object({
     toolExecutionId: z.string().describe("Tool execution id (vg_tool_...)."),
     status: jobStatusSchema.optional(),
-    toolType: z.string().optional().describe("Tool name (e.g. GENERATE_IMAGE)."),
+    toolType: z
+      .string()
+      .optional()
+      .describe("Tool name (e.g. GENERATE_IMAGE)."),
     progressPercentage: z
       .number()
       .optional()
       .describe("Completion progress 0-100 (present after polling)."),
-    attemptIndex: z.number().optional().describe("Current or latest attempt index."),
+    attemptIndex: z
+      .number()
+      .optional()
+      .describe("Current or latest attempt index."),
     results: z
       .array(toolSuccessResultSchema)
       .optional()
@@ -374,7 +527,9 @@ export const toolExecutionOutputSchema = z
     error: apiErrorSchema.optional(),
   })
   .passthrough()
-  .describe("Tool execution id, or full execution status after waiting (results when succeeded).");
+  .describe(
+    "Tool execution id, or full execution status after waiting (results when succeeded).",
+  );
 
 /** Single-execution reads always return the full snapshot, unlike starts. */
 export const getToolExecutionOutputSchema = executedToolSchema;
@@ -382,16 +537,25 @@ export const getToolExecutionOutputSchema = executedToolSchema;
 /** Cancellation acknowledges the request; status is fetched separately. */
 export const cancelToolExecutionOutputSchema = z
   .object({
-    toolExecutionId: z.string().describe("Execution for which cancellation was requested."),
+    toolExecutionId: z
+      .string()
+      .describe("Execution for which cancellation was requested."),
   })
   .passthrough()
-  .describe("Cancellation acknowledgment. Use get_tool_execution for status and results.");
+  .describe(
+    "Cancellation acknowledgment. Use get_tool_execution for status and results.",
+  );
 
 export const listToolExecutionsOutputSchema = z
   .object({
-    toolExecutions: z.array(executedToolSchema).describe("Tool executions, most recent first."),
+    toolExecutions: z
+      .array(executedToolSchema)
+      .describe("Tool executions, most recent first."),
     hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+    nextCursor: z
+      .string()
+      .nullable()
+      .describe("Cursor for the next page, or null."),
   })
   .passthrough()
   .describe("Paginated list of tool executions.");
@@ -400,10 +564,14 @@ export const fileOutputSchema = fileInfoSchema;
 
 export const fileUploadOutputSchema = z
   .object({
-    fileId: z.string().describe("File id to use after uploading bytes (vg_file_...)."),
+    fileId: z
+      .string()
+      .describe("File id to use after uploading bytes (vg_file_...)."),
     uploadUrl: z
       .string()
-      .describe("Pre-signed URL: PUT raw file bytes here with no Authorization header."),
+      .describe(
+        "Pre-signed URL: PUT raw file bytes here with no Authorization header.",
+      ),
   })
   .passthrough()
   .describe("Pre-signed upload instructions.");
@@ -412,16 +580,24 @@ export const listFilesOutputSchema = z
   .object({
     files: z.array(fileInfoSchema).describe("Files visible to the API key."),
     hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+    nextCursor: z
+      .string()
+      .nullable()
+      .describe("Cursor for the next page, or null."),
   })
   .passthrough()
   .describe("Paginated list of files.");
 
 export const listTtsVoicesOutputSchema = z
   .object({
-    ttsVoices: z.array(ttsVoiceSchema).describe("Available text-to-speech voices."),
+    ttsVoices: z
+      .array(ttsVoiceSchema)
+      .describe("Available text-to-speech voices."),
     hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+    nextCursor: z
+      .string()
+      .nullable()
+      .describe("Cursor for the next page, or null."),
   })
   .passthrough()
   .describe("Paginated list of TTS voices.");
@@ -436,24 +612,35 @@ export const listLanguagesOutputSchema = z
 const entityReferenceSchema = z
   .object({
     fileId: z.string().describe("Reference image file id (vg_file_...)."),
-    description: z.string().describe("Reference description (empty when unset)."),
+    description: z
+      .string()
+      .describe("Reference description (empty when unset)."),
     role: z
       .enum(["REFERENCE", "BRAND_LOGO", "BRAND_STYLE_GUIDE"])
       .describe(
         "REFERENCE for generation and thumbnails; BRAND_LOGO / BRAND_STYLE_GUIDE for a brand's logo and style guide.",
       ),
-    isDefault: z.boolean().describe("True when this is the primary/thumbnail reference."),
+    isDefault: z
+      .boolean()
+      .describe("True when this is the primary/thumbnail reference."),
   })
   .passthrough()
   .describe("An image reference attached to an entity.");
 
 const entityActorConfigSchema = z
   .object({
-    voiceDisplayName: z.string().nullish().describe("Configured voice display name when set."),
-    hasVoice: z.boolean().describe("True when the actor has a configured voice."),
+    voiceDisplayName: z
+      .string()
+      .nullish()
+      .describe("Configured voice display name when set."),
+    hasVoice: z
+      .boolean()
+      .describe("True when the actor has a configured voice."),
     hasAvatarPresenter: z
       .boolean()
-      .describe("True when the actor has an image reference usable for avatar generation."),
+      .describe(
+        "True when the actor has an image reference usable for avatar generation.",
+      ),
   })
   .passthrough()
   .nullable()
@@ -472,13 +659,25 @@ const entitySchema = z
   .object({
     entityId: z.string().describe("Entity id (vg_enti_...)."),
     entityType: z
-      .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE", "SLIDESHOW_THEME", "BRAND", "LOCATION", "PROP"])
-      .describe("ACTOR, PRODUCT, VISUAL_STYLE, SLIDESHOW_THEME, BRAND, LOCATION, or PROP."),
+      .enum([
+        "ACTOR",
+        "PRODUCT",
+        "VISUAL_STYLE",
+        "SLIDESHOW_THEME",
+        "BRAND",
+        "LOCATION",
+        "PROP",
+      ])
+      .describe(
+        "ACTOR, PRODUCT, VISUAL_STYLE, SLIDESHOW_THEME, BRAND, LOCATION, or PROP.",
+      ),
     name: z.string().describe("Display name."),
     description: z.string().describe("Description (empty when unset)."),
     actorConfig: entityActorConfigSchema.optional(),
     brandConfig: entityBrandConfigSchema.optional(),
-    references: z.array(entityReferenceSchema).describe("Attached reference images."),
+    references: z
+      .array(entityReferenceSchema)
+      .describe("Attached reference images."),
     createdAt: z.number().describe("Unix created-at timestamp."),
     updatedAt: z.number().describe("Unix updated-at timestamp."),
     isBuiltIn: z
@@ -495,9 +694,14 @@ export const entityOutputSchema = entitySchema;
 
 export const listEntitiesOutputSchema = z
   .object({
-    entities: z.array(entitySchema).describe("Entities visible to the API key."),
+    entities: z
+      .array(entitySchema)
+      .describe("Entities visible to the API key."),
     hasMore: z.boolean().describe("Whether another page is available."),
-    nextCursor: z.string().nullable().describe("Cursor for the next page, or null."),
+    nextCursor: z
+      .string()
+      .nullable()
+      .describe("Cursor for the next page, or null."),
   })
   .passthrough()
   .describe("Paginated list of entities.");
@@ -512,7 +716,11 @@ export const entityArchiveOutputSchema = z
 
 export const openUploaderOutputSchema = z
   .object({
-    status: z.string().describe("Uploader launch status: ready. This is not an upload completion result; the widget reports the file id after the user uploads."),
+    status: z
+      .string()
+      .describe(
+        "Uploader launch status: ready. This is not an upload completion result; the widget reports the file id after the user uploads.",
+      ),
   })
   .passthrough()
   .describe("ChatGPT App upload-widget launch result.");
@@ -535,3 +743,121 @@ export const getAppDeepLinkOutputSchema = z
   })
   .passthrough()
   .describe("VideoGen app deep link for an assistant COMMON action.");
+
+export const billingAccountOutputSchema = z
+  .object({
+    teamId: z.string().describe("Team whose credits and billing access apply."),
+    teamName: z.string().optional().describe("Team display name."),
+    creditsRemaining: z.number().describe("Usable credit balance."),
+    currency: z.string().optional().describe("Purchase currency (usd)."),
+    purchaseLimitMinor: z
+      .number()
+      .optional()
+      .describe("Per-purchase limit in minor currency units (cents)."),
+    accessExpiresAt: z
+      .number()
+      .optional()
+      .describe("When delegated billing access expires, in Unix seconds."),
+    canPurchase: z
+      .boolean()
+      .describe("Whether this credential may buy credits right now."),
+    purchaseRestriction: z
+      .string()
+      .nullish()
+      .describe("Why purchases are unavailable, when canPurchase is false."),
+    creditPack: z
+      .object({
+        minimumCredits: z.number(),
+        stepCredits: z.number(),
+        maximumCredits: z.number(),
+      })
+      .passthrough()
+      .optional()
+      .describe("Allowed credit quantities for a new order."),
+  })
+  .passthrough()
+  .describe(
+    "Team credit balance and this credential's delegated billing access.",
+  );
+
+export const billingOrderOutputSchema = z
+  .object({
+    orderId: z.string().describe("Client-generated order UUID."),
+    state: z
+      .enum([
+        "requires_approval",
+        "requires_action",
+        "processing",
+        "paid_pending_fulfillment",
+        "fulfilled",
+        "failed",
+        "canceled",
+        "expired",
+      ])
+      .describe("Payment and credit fulfillment state."),
+    revision: z.number().describe("Quote revision to approve when completing."),
+    teamId: z.string().optional().describe("Beneficiary team id."),
+    teamName: z.string().optional().describe("Beneficiary team name."),
+    seller: z.string().optional().describe("Seller of record."),
+    credits: z.number().optional().describe("Credits purchased by this order."),
+    currency: z.string().optional().describe("Order currency."),
+    subtotalMinor: z.number().optional().describe("Subtotal in minor units."),
+    discountMinor: z.number().optional().describe("Discount in minor units."),
+    taxMinor: z.number().optional().describe("Tax in minor units."),
+    feesMinor: z.number().optional().describe("Fees in minor units."),
+    totalMinor: z
+      .number()
+      .optional()
+      .describe("Total to approve, in minor units."),
+    expiresAt: z.number().optional().describe("Quote expiry in Unix seconds."),
+    refundTerms: z
+      .string()
+      .optional()
+      .describe("Refund terms to show before approval."),
+    refundStatus: z
+      .enum(["none", "requested", "processing", "succeeded", "failed"])
+      .optional()
+      .describe("Refund request status, separate from the payment state."),
+    verificationUrl: z
+      .string()
+      .nullish()
+      .describe(
+        "Secure verification continuation for the purchaser, when required.",
+      ),
+    receiptUrl: z.string().nullish().describe("Receipt URL once paid."),
+    retryGuidance: z
+      .string()
+      .optional()
+      .describe("How to safely resolve or retry this order."),
+  })
+  .passthrough()
+  .describe("Credit purchase order with its quoted terms and current outcome.");
+
+export const startVideoEditsOutputSchema = z
+  .object({
+    projectId: z.string(),
+    projectUrl: z.string(),
+    videoEditIds: z.array(z.string()),
+  })
+  .passthrough();
+export const listVideoEditsOutputSchema = z
+  .object({
+    videoEdits: z.array(
+      z
+        .object({
+          videoEditId: z.string(),
+          editableVideoId: z.string().nullable(),
+          type: z.string(),
+          status: jobStatusSchema,
+          projectId: z.string(),
+          projectUrl: z.string(),
+          progressPercentage: z.number(),
+          attemptIndex: z.number(),
+          error: apiErrorSchema,
+        })
+        .passthrough(),
+    ),
+    hasMore: z.boolean(),
+    nextCursor: z.string().nullable(),
+  })
+  .passthrough();

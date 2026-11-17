@@ -5,6 +5,7 @@ import {
   toScriptToVideoRequest,
   toSlideshowToVideoRequest,
   toStoryboardToVideoRequest,
+  toTranslateVideoRequest,
   toVideoToVideoRequest,
   toVoiceoverToVideoRequest,
 } from "./workflowAdapters";
@@ -25,8 +26,8 @@ const mcpWorkflowDefaults = {
   },
 };
 
-describe("workflow MCP adapters", () => {
-  it("maps minimal script and voiceover inputs to persistent AI-image workflows", () => {
+void describe("workflow MCP adapters", () => {
+  void it("maps minimal script and voiceover inputs to persistent AI-image workflows", () => {
     assert.deepEqual(toScriptToVideoRequest({ script: "Hello world." }), {
       script: "Hello world.",
       visualStyle: mcpVisualStyle,
@@ -40,7 +41,7 @@ describe("workflow MCP adapters", () => {
     });
   });
 
-  it("maps slideshow and prompt-video creative options", () => {
+  void it("maps slideshow and prompt-video creative options", () => {
     assert.deepEqual(
       toSlideshowToVideoRequest({
         fileId: "vg_file_slides",
@@ -94,7 +95,7 @@ describe("workflow MCP adapters", () => {
     );
   });
 
-  it("maps simplified storyboard scenes to the exact API scene contract", () => {
+  void it("maps simplified storyboard scenes to the exact API scene contract", () => {
     assert.deepEqual(
       toStoryboardToVideoRequest({
         scenes: [
@@ -131,7 +132,7 @@ describe("workflow MCP adapters", () => {
     );
   });
 
-  it("maps a linked or uploaded source video to the video-to-video request", () => {
+  void it("maps a linked or uploaded source video to the video-to-video request", () => {
     assert.deepEqual(
       toVideoToVideoRequest(
         videoToVideoInputSchema.parse({
@@ -139,7 +140,6 @@ describe("workflow MCP adapters", () => {
           prompt: "Hand-made claymation with soft studio lighting.",
           trimStartSeconds: 4,
           trimEndSeconds: 34,
-          aspectRatio: { width: 9, height: 16 },
           quality: "MAX",
           audio: "GENERATE",
         }),
@@ -149,7 +149,6 @@ describe("workflow MCP adapters", () => {
         videoUrl: "https://example.com/watch/clip",
         trimStartSeconds: 4,
         trimEndSeconds: 34,
-        aspectRatio: { width: 9, height: 16 },
         quality: "MAX",
         audio: "GENERATE",
         ...mcpWorkflowDefaults,
@@ -173,9 +172,10 @@ describe("workflow MCP adapters", () => {
     );
   });
 
-  it("requires exactly one video-to-video source", () => {
+  void it("requires exactly one video-to-video source", () => {
     assert.equal(
-      videoToVideoInputSchema.safeParse({ prompt: "Watercolor painting." }).success,
+      videoToVideoInputSchema.safeParse({ prompt: "Watercolor painting." })
+        .success,
       false,
     );
     assert.equal(
@@ -185,6 +185,37 @@ describe("workflow MCP adapters", () => {
         prompt: "Watercolor painting.",
       }).success,
       false,
+    );
+  });
+});
+
+void it("video-to-video does not expose an aspect ratio option", () => {
+  assert.equal("aspectRatio" in videoToVideoInputSchema.shape, false);
+
+  void it("maps translate inputs and omits an absent source language", () => {
+    assert.deepEqual(
+      toTranslateVideoRequest({ videoFileId: "vg_file_video", outputLanguages: ["es", "fr"] }),
+      {
+        videoFileId: "vg_file_video",
+        outputLanguages: ["es", "fr"],
+        ...mcpWorkflowDefaults,
+      },
+    );
+
+    assert.deepEqual(
+      toTranslateVideoRequest({
+        videoFileId: "vg_file_video",
+        outputLanguages: ["de"],
+        sourceLanguage: "en",
+        autoExport: false,
+      }),
+      {
+        videoFileId: "vg_file_video",
+        outputLanguages: ["de"],
+        sourceLanguage: "en",
+        isOutputTemporary: false,
+        autoExport: false,
+      },
     );
   });
 });

@@ -5,10 +5,13 @@ import type { GetVideoGenClient } from "./client";
 import { registerGuidance } from "./guidance/registerGuidance";
 import type { McpHostSurface } from "./hostSurface";
 import type { McpOperations } from "./operations";
+import { registerBillingTools } from "./tools/billing";
 import { registerAccountTools } from "./tools/account";
 import { registerAppDeepLinkTool } from "./tools/appDeepLink";
+import { registerAssistantTools } from "./tools/assistant";
 import { registerEntityTools } from "./tools/entities";
 import { registerFileTools } from "./tools/files";
+import { registerFileUrlImportTools } from "./tools/fileUrlImports";
 import { registerHomeWidget } from "./tools/homeWidget";
 import { registerMediaPreviewWidget } from "./tools/mediaPreviewWidget";
 import { registerMediaToolTools } from "./tools/mediaTools";
@@ -33,10 +36,13 @@ export function registerTools(
   registerWorkflowTools(server, getClient, operations);
   registerMediaToolTools(server, getClient, operations, mediaPreviewMeta);
   registerProjectTools(server, getClient, operations, mediaPreviewMeta);
+  registerAssistantTools(server, getClient, operations);
   registerFileTools(server, getClient, executionMode, operations, mediaPreviewMeta, hostSurface);
+  registerFileUrlImportTools(server, getClient, operations);
   registerEntityTools(server, getClient, operations);
   registerResourceTools(server, getClient, operations);
   registerAccountTools(server, getClient, operations);
+  registerBillingTools(server, getClient, operations, hostSurface);
   registerAppDeepLinkTool(server, hostSurface);
 
   // ChatGPT App widgets need the MCP Apps host bridge (`window.openai`), which

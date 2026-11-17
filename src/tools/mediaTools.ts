@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
+  toDubVideoRequest,
   toGenerateAvatarRequest,
   toGenerateImageRequest,
   toGenerateMotionGraphicRequest,
@@ -18,6 +19,7 @@ import { MEDIA_PREVIEW_TOOL_META } from "../appWidget";
 import type { GetVideoGenClient } from "../client";
 import {
   cancelToolExecutionInputSchema,
+  dubVideoInputSchema,
   generateAvatarInputSchema,
   generateImageInputSchema,
   generateMotionGraphicInputSchema,
@@ -81,7 +83,7 @@ export function registerMediaToolTools(
     {
       title: "Generate image",
       description:
-        "Generate an image from a text prompt, optionally conditioned on source images (image-to-image) and actor, product, or visual-style entity ids. Typically takes 15–60 seconds. Tell the user that wait up front.",
+        "Use for a standalone AI image: product imagery, ad concepts, storyboard frames, or campaign visuals. Generate from a prompt, optionally using source images and saved actor, product, or visual-style entity ids. References guide the result without guaranteeing exact reproduction. Creates an image file using team credits; it does not create a finished video project. Typically takes 15–60 seconds; explain that wait before starting. Poll get_tool_execution for the output file and downloadUrl.",
       inputSchema: generateImageInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -99,7 +101,7 @@ export function registerMediaToolTools(
     {
       title: "Generate video clip",
       description:
-        "Generate a video clip from a text prompt, source images, source videos, spokenDialogue, or reference audio. Combining videoFileIds with startFrameFileId or imageFileIds requires quality HIGH or MAX. Reference media guides generation without guaranteeing exact reproduction. Typically takes 1–3 minutes (HIGH/MAX can be longer). Tell the user that wait up front and keep polling calmly.",
+        "Use for standalone text to video or image to video: animate a product photo, generate a product-in-use shot, or create a clip from reference footage. Accepts a text prompt, source images, source videos, spokenDialogue, or reference audio. Image and video references can be combined at every quality. References guide generation without guaranteeing exact reproduction. Creates a media file using team credits; use storyboard_to_video for an editable multi-scene ad. Typically takes 1–3 minutes (HIGH/MAX can take longer). Explain that wait and poll get_tool_execution for the output file and downloadUrl.",
       inputSchema: generateVideoClipInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -116,7 +118,7 @@ export function registerMediaToolTools(
     "text_to_speech",
     {
       title: "Text to speech",
-      description: "Synthesize spoken audio from text using a catalog voice that supportsDirectToolExecution. Returns toolExecutionId on hosted clients; poll get_tool_execution for status and results containing the audio fileId, downloadUrl, and file metadata. Local calls wait for a status snapshot.",
+      description: "Synthesize spoken audio from text using any catalog voice. Returns toolExecutionId on hosted clients; poll get_tool_execution for status and results containing the audio fileId, downloadUrl, and file metadata. Local calls wait for a status snapshot.",
       inputSchema: textToSpeechInputSchema,
       outputSchema: toolExecutionOutputSchema,
       annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
@@ -284,6 +286,23 @@ export function registerMediaToolTools(
     async (args) =>
       await runComposite({
         start: () => getClient().tools.upscaleVideo(toUpscaleVideoRequest(args)),
+        ...mediaGeneration,
+        controls: {},
+      }),
+  );
+
+  server.registerTool(
+    "dub_video",
+    {
+      title: "Dub video",
+      description: "Create a copy of an existing video with its speech translated into another language, keeping the original voices and timing. Returns toolExecutionId; get_tool_execution provides status and the output video file. The source file is unchanged. Use translate_video instead when the user wants an editable project or several languages.",
+      inputSchema: dubVideoInputSchema,
+      outputSchema: toolExecutionOutputSchema,
+      annotations: WRITE_PRIVATE_TOOL_ANNOTATIONS,
+    },
+    async (args) =>
+      await runComposite({
+        start: () => getClient().tools.dubVideo(toDubVideoRequest(args)),
         ...mediaGeneration,
         controls: {},
       }),

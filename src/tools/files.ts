@@ -113,6 +113,31 @@ export function registerFileTools(
   hostSurface: McpHostSurface,
 ): void {
   const hideDirectUploadsFromModel = executionMode === "HOSTED" && hostSurface === "CHATGPT_APP";
+  if (mediaPreviewMeta != null) {
+    server.registerTool(
+      "show_media_preview",
+      {
+        title: "Show media preview",
+        description:
+          "Display actual VideoGen images, video, or audio in the conversation. After generation or export succeeds, call this with the returned file ids to show the finished results. Also use it for existing files found with list_files. Fetches fresh authorized file URLs; it does not generate, modify, or publish anything. Use file ids from VideoGen results, not invented URLs or substitute illustrations.",
+        inputSchema: {
+          fileIds: z.array(z.string().min(1)).min(1).max(12).describe("Completed VideoGen file ids (vg_file_...) to display."),
+        },
+        outputSchema: { results: z.array(z.object({ file: fileOutputSchema })) },
+        annotations: READ_ONLY_TOOL_ANNOTATIONS,
+        _meta: mediaPreviewMeta,
+      },
+      async ({ fileIds }) =>
+        await respondSdk(async () => ({
+          results: await Promise.all(
+            [...new Set(fileIds)].map(async (fileId) => ({
+              file: await getHydratedFile({ client: getClient(), fileId }),
+            })),
+          ),
+        })),
+    );
+  }
+
   const uploadFileMeta =
     mediaPreviewMeta == null
       ? null

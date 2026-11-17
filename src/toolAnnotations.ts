@@ -8,14 +8,15 @@ import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
  * Meanings (OpenAI Apps SDK review):
  * - idempotentHint: repeating the same call adds no further environmental effect
  * - readOnlyHint: true only when the tool never mutates state
- * - openWorldHint: true only when the tool can change publicly visible internet
- *   state or third-party systems outside the user's private VideoGen account
+ * - openWorldHint: true when the tool accesses public/open-ended entities or
+ *   arbitrary external destinations, including read-only imports from URLs.
+ *   A bounded private account or catalog can use false even when hosted remotely.
  * - destructiveHint: true when the tool can delete, detach, archive, cancel, or
  *   overwrite existing records (meaningful only when readOnlyHint is false).
  *   Creating a new file or project is not destructive.
  *
- * All VideoGen tools operate inside the caller's private VideoGen account, so
- * openWorldHint is false across the surface.
+ * Tools confined to the caller's private VideoGen account use closed-world
+ * annotations. Tools that also accept arbitrary public URLs use open-world hints.
  */
 
 /** Fetches, lists, or computes without creating or updating records. */
@@ -36,6 +37,12 @@ export const WRITE_PRIVATE_TOOL_ANNOTATIONS = {
   openWorldHint: false,
   destructiveHint: false,
 } as const satisfies ToolAnnotations;
+
+/** Creates private VideoGen output while importing from arbitrary public URLs. */
+export const WRITE_PUBLIC_IMPORT_TOOL_ANNOTATIONS = {
+  ...WRITE_PRIVATE_TOOL_ANNOTATIONS,
+  openWorldHint: true,
+} satisfies ToolAnnotations;
 
 /**
  * Deletes, detaches, archives, cancels, or overwrites existing private

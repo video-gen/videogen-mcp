@@ -3,7 +3,11 @@ import { describe, it } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import { generateImageInputSchema, generateMotionGraphicInputSchema, scriptToVideoInputSchema } from "./adapters/creativeToolContracts";
+import {
+  generateImageInputSchema,
+  generateMotionGraphicInputSchema,
+  scriptToVideoInputSchema,
+} from "./adapters/creativeToolContracts";
 import { SERVER_VERSION, buildMcpServer } from "./buildServer";
 import { createVideoGenClientFromToken } from "./client";
 
@@ -14,6 +18,7 @@ const CREATIVE_TOOL_NAMES = new Set([
   "storyboard_to_video",
   "prompt_to_video_clip",
   "video_to_video",
+  "translate_video",
   "generate_image",
   "generate_video_clip",
   "text_to_speech",
@@ -26,9 +31,10 @@ const CREATIVE_TOOL_NAMES = new Set([
   "remove_video_background",
   "upscale_image",
   "upscale_video",
+  "dub_video",
   "image_3d_effect",
   "export_project",
-  "remix_project",
+  "start_video_edits",
 ]);
 
 const FORBIDDEN_FIELDS = [
@@ -76,7 +82,9 @@ describe("creative tools/list contracts", () => {
       prompt: "A product photo.",
       watermarkMode: "NONE",
     };
-    assert.deepEqual(generateImageInputSchema.parse(staleInput), { prompt: "A product photo." });
+    assert.deepEqual(generateImageInputSchema.parse(staleInput), {
+      prompt: "A product photo.",
+    });
   });
 
   it("accepts aspectRatio width/height objects", () => {
@@ -121,14 +129,23 @@ describe("creative tools/list contracts", () => {
       null,
       true,
     );
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: "creative-contract-test", version: SERVER_VERSION });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const client = new Client({
+      name: "creative-contract-test",
+      version: SERVER_VERSION,
+    });
 
-    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    await Promise.all([
+      server.connect(serverTransport),
+      client.connect(clientTransport),
+    ]);
 
     try {
       const { tools } = await client.listTools();
-      const creativeTools = tools.filter((tool) => CREATIVE_TOOL_NAMES.has(tool.name));
+      const creativeTools = tools.filter((tool) =>
+        CREATIVE_TOOL_NAMES.has(tool.name),
+      );
 
       assert.equal(creativeTools.length, CREATIVE_TOOL_NAMES.size);
 
@@ -136,8 +153,14 @@ describe("creative tools/list contracts", () => {
         const serializedSchema = JSON.stringify(tool.inputSchema);
 
         for (const forbiddenField of FORBIDDEN_FIELDS) {
+          // Caption styling is supported inside a canonical video edit, while
+          // the curated workflow itself still does not expose a raw captionStyle field.
+          const fieldIsAdvertised =
+            forbiddenField === "captionStyle"
+              ? Object.hasOwn(tool.inputSchema.properties ?? {}, forbiddenField)
+              : serializedSchema.includes(`"${forbiddenField}"`);
           assert.equal(
-            serializedSchema.includes(`"${forbiddenField}"`),
+            fieldIsAdvertised,
             false,
             `${tool.name} advertises forbidden field ${forbiddenField}`,
           );
@@ -161,9 +184,15 @@ describe("creative tools/list contracts", () => {
           default: z.boolean().optional(),
           description: z.string().optional(),
         })
-        .parse(motionGraphicTool?.inputSchema.properties?.transparentBackground ?? {});
+        .parse(
+          motionGraphicTool?.inputSchema.properties?.transparentBackground ??
+            {},
+        );
       assert.equal(transparentBackgroundSchema.default, true);
-      assert.match(transparentBackgroundSchema.description ?? "", /transparent WebM/);
+      assert.match(
+        transparentBackgroundSchema.description ?? "",
+        /transparent WebM/,
+      );
       assert.match(transparentBackgroundSchema.description ?? "", /overlay/);
       assert.match(transparentBackgroundSchema.description ?? "", /opaque MP4/);
       assert.ok(
@@ -171,14 +200,16 @@ describe("creative tools/list contracts", () => {
         "generate_motion_graphic must advertise subToolModes so ChatGPT stays aligned with the API",
       );
 
-      const remixProjectTool = creativeTools.find((tool) => tool.name === "remix_project");
+      const remixProjectTool = creativeTools.find(
+        (tool) => tool.name === "start_video_edits",
+      );
       assert.notEqual(remixProjectTool, undefined);
       const remixSchemaText = JSON.stringify(remixProjectTool?.inputSchema);
       assert.match(remixSchemaText, /CONVERT_IMAGES_TO_VIDEOS/);
       assert.equal(
         remixSchemaText.includes("ANIMATE_IMAGES"),
         false,
-        "remix_project must not advertise ANIMATE_IMAGES; that name reads like cheap motion",
+        "start_video_edits must not advertise ANIMATE_IMAGES; that name reads like cheap motion",
       );
       assert.match(remixSchemaText, /ZOOM/);
     } finally {

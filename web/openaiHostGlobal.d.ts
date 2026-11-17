@@ -20,6 +20,7 @@ export type OpenAiSelectedFile = {
  * not provide this object.
  */
 export type OpenAiHost = {
+  theme?: "light" | "dark";
   callTool: (
     name: string,
     args: Record<string, unknown>,
@@ -32,6 +33,7 @@ export type OpenAiHost = {
   /** Arguments the model passed to the tool that opened this widget. */
   toolInput?: unknown;
   openExternal?: (args: { href: string; redirectUrl?: boolean }) => void;
+  setOpenInAppUrl?: (args: { href: string }) => void;
   selectFiles?: () => Promise<OpenAiSelectedFile[]>;
   getFileDownloadUrl?: (args: { fileId: string }) => Promise<{ downloadUrl: string }>;
 };

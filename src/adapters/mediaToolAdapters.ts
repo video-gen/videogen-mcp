@@ -1,4 +1,5 @@
 import type {
+  DubVideoRequest,
   GenerateAvatarRequest,
   GenerateImageRequest,
   GenerateMotionGraphicRequest,
@@ -11,6 +12,7 @@ import type {
 } from "@videogen/sdk";
 import { z } from "zod";
 import {
+  dubVideoInputSchema,
   generateAvatarInputSchema,
   generateImageInputSchema,
   generateMotionGraphicInputSchema,
@@ -39,6 +41,7 @@ type RemoveVideoBackgroundInput = z.infer<typeof removeVideoBackgroundInputSchem
 type UpscaleImageInput = z.infer<typeof upscaleImageInputSchema>;
 type UpscaleVideoInput = z.infer<typeof upscaleVideoInputSchema>;
 type Image3dEffectInput = z.infer<typeof image3dEffectInputSchema>;
+type DubVideoInput = z.infer<typeof dubVideoInputSchema>;
 
 const mcpMediaDefaults = {
   numResults: 1 as const,
@@ -112,6 +115,7 @@ export function toGenerateMusicRequest(input: GenerateMusicInput): GenerateMusic
   return {
     prompt: input.prompt,
     ...mcpMediaDefaults,
+    ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
   };
 }
 
@@ -181,4 +185,13 @@ export function toUpscaleVideoRequest(input: UpscaleVideoInput): VideoAssetReque
 
 export function toImage3dEffectRequest(input: Image3dEffectInput): ImageAssetRequest {
   return { imageFileId: input.imageFileId, ...mcpMediaDefaults, ...mcpAutoWatermark };
+}
+
+export function toDubVideoRequest(input: DubVideoInput): DubVideoRequest {
+  return {
+    videoFileId: input.videoFileId,
+    targetLanguage: input.targetLanguage,
+    isOutputTemporary: false,
+    ...(input.sourceLanguage != null && { sourceLanguage: input.sourceLanguage }),
+  };
 }

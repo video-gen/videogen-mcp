@@ -1,3 +1,4 @@
+import { videoEditOperationSchema } from "../generated/videoEditOperationSchema";
 import { z } from "zod";
 import { MCP_AI_STYLE_FIELD_DESCRIPTION } from "./aiStylePresetExamples";
 
@@ -17,8 +18,14 @@ export { DEFAULT_MCP_AI_STYLE } from "./aiStylePresetExamples";
  */
 export const creativeAspectRatioSchema = z
   .object({
-    width: z.number().positive().describe("Aspect-ratio width unit (e.g. 16 for 16:9)."),
-    height: z.number().positive().describe("Aspect-ratio height unit (e.g. 9 for 16:9)."),
+    width: z
+      .number()
+      .positive()
+      .describe("Aspect-ratio width unit (e.g. 16 for 16:9)."),
+    height: z
+      .number()
+      .positive()
+      .describe("Aspect-ratio height unit (e.g. 9 for 16:9)."),
   })
   .describe(
     "Output aspect ratio as width:height units (not pixels). Example: { width: 16, height: 9 }.",
@@ -33,12 +40,16 @@ const videoQualitySchema = z
   .describe("Video generation quality. Omit to use workspace settings.");
 
 const storyboardImageQualitySchema = z
-  .enum(["HIGH", "MAX"])
+  .enum(["LOW", "STANDARD", "HIGH", "MAX"])
   .describe(
     "Image generation quality for scene opening frames. Omit to use HIGH. Does not change video generation quality.",
   );
 
-const styleSchema = z.string().min(1).optional().describe(MCP_AI_STYLE_FIELD_DESCRIPTION);
+const styleSchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(MCP_AI_STYLE_FIELD_DESCRIPTION);
 
 const languageSchema = z
   .string()
@@ -48,7 +59,9 @@ const languageSchema = z
 const voiceIdSchema = z
   .string()
   .optional()
-  .describe("Catalog display name (e.g. Matilda) or voice id from list_tts_voices.");
+  .describe(
+    "Catalog display name (e.g. Matilda) or voice id from list_tts_voices.",
+  );
 
 const avatarQualitySchema = imageQualitySchema.describe(
   "Avatar generation quality tier. Applies when actorEntityId is provided. Omit to use workspace settings.",
@@ -65,10 +78,16 @@ const autoExportSchema = z
   .boolean()
   .optional()
   .describe(
-    "When true (the default), the run stays in progress until an MP4 is ready. Use downloadUrl from the result. Set false only if you will call remix_project and then export_project yourself.",
+    "When true (the default), the run stays in progress until an MP4 is ready. Use downloadUrl from the result. Set false only if you will call start_video_edits and then export_project yourself.",
   );
 
 export const scriptToVideoInputSchema = z.object({
+  videoEdits: z
+    .array(videoEditOperationSchema)
+    .optional()
+    .describe(
+      "Ordered video edits applied after the workflow builds its output.",
+    ),
   script: z.string().min(1).describe("Narration script, spoken verbatim."),
   style: styleSchema,
   aspectRatio: creativeAspectRatioSchema.optional(),
@@ -81,6 +100,12 @@ export const scriptToVideoInputSchema = z.object({
 });
 
 export const voiceoverToVideoInputSchema = z.object({
+  videoEdits: z
+    .array(videoEditOperationSchema)
+    .optional()
+    .describe(
+      "Ordered video edits applied after the workflow builds its output.",
+    ),
   fileId: z.string().describe("Uploaded voiceover audio file id."),
   style: styleSchema,
   aspectRatio: creativeAspectRatioSchema.optional(),
@@ -90,6 +115,12 @@ export const voiceoverToVideoInputSchema = z.object({
 });
 
 export const slideshowToVideoInputSchema = z.object({
+  videoEdits: z
+    .array(videoEditOperationSchema)
+    .optional()
+    .describe(
+      "Ordered video edits applied after the workflow builds its output.",
+    ),
   fileId: z.string().describe("Uploaded PDF or slideshow file id."),
   slideScripts: z
     .array(z.string())
@@ -113,9 +144,18 @@ const optionalEntityIdListSchema = ({ description }: { description: string }) =>
   z.array(z.string()).optional().describe(description);
 
 const storyboardSceneSchema = z.object({
-  prompt: z.string().min(1).describe("Visual description of what should appear in this scene."),
-  voiceoverScript: z.string().optional().describe("Words spoken during this scene."),
-  title: z.string().optional().describe("Scene label used to identify the shot."),
+  prompt: z
+    .string()
+    .min(1)
+    .describe("Visual description of what should appear in this scene."),
+  voiceoverScript: z
+    .string()
+    .optional()
+    .describe("Words spoken during this scene."),
+  title: z
+    .string()
+    .optional()
+    .describe("Scene label used to identify the shot."),
   durationSeconds: z
     .number()
     .int()
@@ -142,6 +182,12 @@ const storyboardSceneSchema = z.object({
 });
 
 export const storyboardToVideoInputSchema = z.object({
+  videoEdits: z
+    .array(videoEditOperationSchema)
+    .optional()
+    .describe(
+      "Ordered video edits applied after the workflow builds its output.",
+    ),
   scenes: z
     .array(storyboardSceneSchema)
     .min(1)
@@ -168,8 +214,16 @@ export const promptToVideoClipInputSchema = z.object({
     .array(z.string())
     .max(4)
     .optional()
-    .describe("Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files."),
-  durationSeconds: z.number().int().min(1).max(30).optional().describe("Requested clip playback duration in seconds."),
+    .describe(
+      "Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files.",
+    ),
+  durationSeconds: z
+    .number()
+    .int()
+    .min(1)
+    .max(30)
+    .optional()
+    .describe("Requested clip playback duration in seconds."),
   aspectRatio: creativeAspectRatioSchema.optional(),
   quality: videoQualitySchema.optional(),
   autoExport: autoExportSchema,
@@ -177,10 +231,16 @@ export const promptToVideoClipInputSchema = z.object({
 
 export const videoToVideoInputSchema = z
   .object({
+    videoEdits: z
+      .array(videoEditOperationSchema)
+      .optional()
+      .describe("Ordered video edits applied after generation."),
     videoFileId: z
       .string()
       .optional()
-      .describe("Uploaded video file id to restyle. Provide this or videoUrl, not both."),
+      .describe(
+        "Uploaded video file id to restyle. Provide this or videoUrl, not both.",
+      ),
     videoUrl: z
       .string()
       .max(2048)
@@ -193,7 +253,9 @@ export const videoToVideoInputSchema = z
       .number()
       .min(0)
       .optional()
-      .describe("Second of the video where the restyled part starts. Defaults to 0."),
+      .describe(
+        "Second of the video where the restyled part starts. Defaults to 0.",
+      ),
     trimEndSeconds: z
       .number()
       .min(0)
@@ -206,11 +268,6 @@ export const videoToVideoInputSchema = z
       .max(10)
       .optional()
       .describe("Optional reference image file ids that guide the look."),
-    aspectRatio: creativeAspectRatioSchema
-      .optional()
-      .describe(
-        "Output aspect ratio as width:height units. With videoFileId, defaults to the closest match to the source. With videoUrl, defaults to 16:9, so pass it for vertical or square videos.",
-      ),
     quality: z
       .enum(["LOW", "STANDARD", "HIGH", "MAX"])
       .optional()
@@ -229,13 +286,45 @@ export const videoToVideoInputSchema = z
     message: "Provide exactly one of videoFileId or videoUrl.",
   });
 
+export const translateVideoInputSchema = z.object({
+  videoEdits: z
+    .array(videoEditOperationSchema)
+    .optional()
+    .describe(
+      "Ordered video edits applied after the workflow builds its output.",
+    ),
+  videoFileId: z
+    .string()
+    .describe(
+      "Uploaded video file id whose speech should be translated. Use fileId from upload_file or list_files.",
+    ),
+  outputLanguages: z
+    .array(z.string())
+    .min(1)
+    .max(10)
+    .describe(
+      "Languages to translate into, as BCP-47 codes such as es, fr, or de. Each language becomes its own editable video in the same project.",
+    ),
+  sourceLanguage: z
+    .string()
+    .optional()
+    .describe(
+      "Language spoken in the source video, as a BCP-47 code. Omit to detect it automatically.",
+    ),
+  autoExport: autoExportSchema.describe(
+    "When true (the default), the run stays in progress until an MP4 of the first successful language is ready. Export other languages with export_project and the editableVideoId from the run's outputs.",
+  ),
+});
+
 export const generateImageInputSchema = z.object({
   prompt: z.string().min(1).describe("Description of the image to generate."),
   imageFileIds: z
     .array(z.string())
     .max(4)
     .optional()
-    .describe("Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files."),
+    .describe(
+      "Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files.",
+    ),
   entityIds: z
     .array(z.string())
     .optional()
@@ -248,13 +337,29 @@ export const generateImageInputSchema = z.object({
 
 export const generateVideoClipInputSchema = z
   .object({
-    prompt: z.string().min(1).optional().describe("Description of the video to generate."),
+    prompt: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("Description of the video to generate."),
     startFrameFileId: z
       .string()
       .optional()
-      .describe("Optional opening-frame still file id. Used as the first frame of the clip. Combining this with videoFileIds requires quality HIGH or MAX."),
-    imageFileIds: z.array(z.string()).optional().describe("Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files. Combining these with videoFileIds requires quality HIGH or MAX."),
-    videoFileIds: z.array(z.string()).optional().describe("Reference videos for motion or style guidance, without guaranteeing exact reproduction. Combining these with startFrameFileId or imageFileIds requires quality HIGH or MAX."),
+      .describe(
+        "Optional opening-frame still file id. Used as the first frame when no video references are attached. Can be combined with videoFileIds at every quality. With video references, this image guides appearance without guaranteeing an exact first frame.",
+      ),
+    imageFileIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Reference images to guide the generated appearance. Use fileId values from upload_file, get_file, or list_files. Can be combined with videoFileIds at every quality.",
+      ),
+    videoFileIds: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Reference videos for motion or style guidance, without guaranteeing exact reproduction. Can be combined with startFrameFileId or imageFileIds at every quality.",
+      ),
     audioFileIds: z
       .array(z.string())
       .optional()
@@ -290,7 +395,9 @@ export const generateVideoClipInputSchema = z
       .max(30)
       .nullable()
       .optional()
-      .describe("Requested clip playback duration in seconds. Omit or pass null for automatic timing."),
+      .describe(
+        "Requested clip playback duration in seconds. Omit or pass null for automatic timing.",
+      ),
     aspectRatio: creativeAspectRatioSchema.optional(),
     quality: videoQualitySchema.optional(),
   })
@@ -302,25 +409,63 @@ export const generateVideoClipInputSchema = z
       (input.videoFileIds?.length ?? 0) > 0 ||
       (input.audioFileIds?.length ?? 0) > 0 ||
       (input.spokenDialogue != null && input.spokenDialogue.trim().length > 0),
-    { message: "Provide a prompt, spokenDialogue, or at least one reference media file." },
+    {
+      message:
+        "Provide a prompt, spokenDialogue, or at least one reference media file.",
+    },
   );
 
 export const textToSpeechInputSchema = z.object({
   text: z.string().min(1).describe("Words to synthesize as spoken audio."),
   voiceId: z
     .string()
-    .describe("Catalog display name (e.g. Matilda) or voice id from list_tts_voices."),
-  language: z.string().nullable().optional().describe("ISO-639-1 pronunciation language hint, such as en or es. Omit or pass null to leave pronunciation language selection automatic."),
-  speed: z.number().min(0.5).max(2).optional().describe("Speech-rate multiplier relative to the voice's normal speed (1)."),
+    .describe(
+      "Catalog display name (e.g. Matilda) or voice id from list_tts_voices.",
+    ),
+  language: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "ISO-639-1 pronunciation language hint, such as en or es. Omit or pass null to leave pronunciation language selection automatic.",
+    ),
+  speed: z
+    .number()
+    .min(0.5)
+    .max(2)
+    .optional()
+    .describe(
+      "Speech-rate multiplier relative to the voice's normal speed (1).",
+    ),
 });
 
 export const generateSoundEffectInputSchema = z.object({
   prompt: z.string().min(1).describe("Description of the sound effect."),
-  durationSeconds: z.number().min(1).max(30).nullable().optional().describe("Requested sound-effect playback duration in seconds."),
+  durationSeconds: z
+    .number()
+    .min(0.5)
+    .max(30)
+    .nullable()
+    .optional()
+    .describe(
+      "Requested sound-effect playback duration in seconds. Omit or pass null for automatic duration.",
+    ),
 });
 
 export const generateMusicInputSchema = z.object({
-  prompt: z.string().min(1).describe("Genre, mood, instrumentation, and tempo."),
+  prompt: z
+    .string()
+    .min(1)
+    .describe("Genre, mood, instrumentation, and tempo."),
+  durationSeconds: z
+    .number()
+    .min(3)
+    .max(600)
+    .nullable()
+    .optional()
+    .describe(
+      "Track length in seconds. Defaults to 180 seconds when omitted or null.",
+    ),
 });
 
 const motionGraphicSubToolModeSchema = z
@@ -330,13 +475,30 @@ const motionGraphicSubToolModeSchema = z
   );
 
 export const generateMotionGraphicInputSchema = z.object({
-  prompt: z.string().min(1).describe("Description of the animated motion graphic."),
-  fileIds: z.array(z.string()).optional().describe("Media to display or animate in the motion graphic. Use fileId values from upload_file, get_file, or list_files."),
+  prompt: z
+    .string()
+    .min(1)
+    .describe("Description of the animated motion graphic."),
+  fileIds: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Media to display or animate in the motion graphic. Use fileId values from upload_file, get_file, or list_files.",
+    ),
   entityIds: z
     .array(z.string())
     .optional()
-    .describe("Actor, product, or visual-style references. Use entityId values from list_entities or create_entity, with reference files attached."),
-  durationSeconds: z.number().int().min(1).max(300).nullable().optional().describe("Requested motion-graphic playback duration in seconds."),
+    .describe(
+      "Actor, product, or visual-style references. Use entityId values from list_entities or create_entity, with reference files attached.",
+    ),
+  durationSeconds: z
+    .number()
+    .int()
+    .min(1)
+    .max(300)
+    .nullable()
+    .optional()
+    .describe("Requested motion-graphic playback duration in seconds."),
   aspectRatio: creativeAspectRatioSchema.optional(),
   transparentBackground: z
     .boolean()
@@ -346,10 +508,26 @@ export const generateMotionGraphicInputSchema = z.object({
     ),
   subToolModes: z
     .object({
-      generateImages: motionGraphicSubToolModeSchema.optional().describe("Control image generation within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
-      generateVideoClips: motionGraphicSubToolModeSchema.optional().describe("Control video-clip generation within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
-      generateVoiceover: motionGraphicSubToolModeSchema.optional().describe("Control voiceover synthesis within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
-      searchStockMedia: motionGraphicSubToolModeSchema.optional().describe("Control stock-media search within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use."),
+      generateImages: motionGraphicSubToolModeSchema
+        .optional()
+        .describe(
+          "Control image generation within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use.",
+        ),
+      generateVideoClips: motionGraphicSubToolModeSchema
+        .optional()
+        .describe(
+          "Control video-clip generation within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use.",
+        ),
+      generateVoiceover: motionGraphicSubToolModeSchema
+        .optional()
+        .describe(
+          "Control voiceover synthesis within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use.",
+        ),
+      searchStockMedia: motionGraphicSubToolModeSchema
+        .optional()
+        .describe(
+          "Control stock-media search within the motion graphic: AUTO lets the plan decide, ENABLED requires use, and DISABLED prevents use.",
+        ),
     })
     .optional()
     .describe(
@@ -364,29 +542,77 @@ export const generateAvatarInputSchema = z.object({
       "Id of a built-in stock actor or an ACTOR entity (vg_enti_...) with an image reference.",
     ),
   avatarQuality: avatarQualitySchema.optional(),
-  audioFileId: z.string().describe("Speech recording for the actor to lip-sync. Use fileId from an audio upload, list_files, or a succeeded text_to_speech result."),
+  audioFileId: z
+    .string()
+    .describe(
+      "Speech recording for the actor to lip-sync. Use fileId from an audio upload, list_files, or a succeeded text_to_speech result.",
+    ),
 });
 
-const imageFileIdSchema = z.string().describe("Image to transform. Use fileId from upload_file, list_files, or a succeeded image-generation result.");
-const videoFileIdSchema = z.string().describe("Video to transform. Use fileId from upload_file, list_files, or a succeeded video-generation result.");
+const imageFileIdSchema = z
+  .string()
+  .describe(
+    "Image to transform. Use fileId from upload_file, list_files, or a succeeded image-generation result.",
+  );
+const videoFileIdSchema = z
+  .string()
+  .describe(
+    "Video to transform. Use fileId from upload_file, list_files, or a succeeded video-generation result.",
+  );
 
-export const vectorizeImageInputSchema = z.object({ imageFileId: imageFileIdSchema });
+export const vectorizeImageInputSchema = z.object({
+  imageFileId: imageFileIdSchema,
+});
 export const removeImageBackgroundInputSchema = z.object({
   imageFileId: imageFileIdSchema,
 });
 export const removeVideoBackgroundInputSchema = z.object({
   videoFileId: videoFileIdSchema,
 });
-export const upscaleImageInputSchema = z.object({ imageFileId: imageFileIdSchema });
-export const upscaleVideoInputSchema = z.object({ videoFileId: videoFileIdSchema });
-export const image3dEffectInputSchema = z.object({ imageFileId: imageFileIdSchema });
+export const upscaleImageInputSchema = z.object({
+  imageFileId: imageFileIdSchema,
+});
+export const upscaleVideoInputSchema = z.object({
+  videoFileId: videoFileIdSchema,
+});
+export const image3dEffectInputSchema = z.object({
+  imageFileId: imageFileIdSchema,
+});
+export const dubVideoInputSchema = z.object({
+  videoFileId: videoFileIdSchema,
+  targetLanguage: z
+    .string()
+    .describe(
+      "Language to translate the speech into, as a BCP-47 code such as es, fr, or de.",
+    ),
+  sourceLanguage: z
+    .string()
+    .optional()
+    .describe(
+      "Language spoken in the source video, as a BCP-47 code. Omit to detect it automatically.",
+    ),
+});
+
+const editableVideoIdSchema = z
+  .string()
+  .optional()
+  .describe(
+    "Video within the project to target (vg_vide_...), such as one language of a translate_video run. Use editableVideoId from get_workflow_run outputs. Omit to use the project's first video.",
+  );
 
 export const exportProjectInputSchema = z.object({
-  projectId: z.string().describe("Editable project to render. Use projectId from a workflow result, list_projects, or get_project."),
+  projectId: z
+    .string()
+    .describe(
+      "Editable project to render. Use projectId from a workflow result, list_projects, or get_project.",
+    ),
   quality: z
     .enum(["STANDARD", "HIGH", "FULL_HIGH", "ULTRA_HIGH"])
     .optional()
-    .describe("MP4 resolution tier by shortest edge: STANDARD is 720p, HIGH and FULL_HIGH are 1080p, and ULTRA_HIGH is 2160p. Omit for FULL_HIGH."),
+    .describe(
+      "MP4 resolution tier by shortest edge: STANDARD is 720p, HIGH and FULL_HIGH are 1080p, and ULTRA_HIGH is 2160p. Omit for FULL_HIGH.",
+    ),
+  editableVideoId: editableVideoIdSchema,
 });
 
 const remixEditSchema = z
@@ -405,15 +631,41 @@ const remixEditInputSchema = z.preprocess((value) => {
 }, remixEditSchema);
 
 export const remixProjectInputSchema = z.object({
-  projectId: z.string().describe("Editable project to remix. Use projectId from a workflow result, list_projects, or get_project."),
+  projectId: z
+    .string()
+    .describe(
+      "Editable project to remix. Use projectId from a workflow result, list_projects, or get_project.",
+    ),
   edits: z
     .array(remixEditInputSchema)
     .min(1)
     .describe(
       "Curated edits to apply in order. CONVERT_IMAGES_TO_VIDEOS generates AI video clips from every still and is expensive. Use ZOOM for cheap Ken Burns camera motion.",
     ),
-  saveAsNewProject: z.boolean().optional().describe("When true, duplicate the project and apply edits to the copy. When omitted, edit the original project in place."),
+  saveAsNewProject: z
+    .boolean()
+    .optional()
+    .describe(
+      "When true, duplicate the project and apply edits to the copy. When omitted, edit the original project in place. Cannot be combined with editableVideoId.",
+    ),
+  editableVideoId: editableVideoIdSchema,
 });
 
 export type CreativeAspectRatio = z.infer<typeof creativeAspectRatioSchema>;
-export type RemixEdit = z.infer<typeof remixProjectInputSchema>["edits"][number];
+export type RemixEdit = z.infer<
+  typeof remixProjectInputSchema
+>["edits"][number];
+
+export const startVideoEditsInputSchema = z.object({
+  projectId: z.string().describe("Project containing the video to edit."),
+  editableVideoId: z
+    .string()
+    .describe(
+      "The explicit video to edit. Use list_project_artifacts to find its id.",
+    ),
+  videoEdits: z.array(videoEditOperationSchema).min(1),
+  saveAsNewProject: z
+    .boolean()
+    .optional()
+    .describe("Apply these edits to a copy of this video’s project."),
+});

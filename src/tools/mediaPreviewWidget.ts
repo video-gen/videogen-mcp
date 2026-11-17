@@ -1,9 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  MEDIA_PREVIEW_WIDGET_CSP,
   MEDIA_PREVIEW_WIDGET_URI,
   WIDGET_MIME_TYPE,
   buildWidgetResourceMeta,
+  getMediaPreviewWidgetCsp,
   getMediaPreviewWidgetHtml,
 } from "../appWidget";
 
@@ -19,7 +19,7 @@ import {
  */
 export function registerMediaPreviewWidget(server: McpServer): void {
   const resourceMeta = buildWidgetResourceMeta({
-    csp: MEDIA_PREVIEW_WIDGET_CSP,
+    csp: getMediaPreviewWidgetCsp(),
     widgetDescription:
       "Inline preview of generated or exported VideoGen images, videos, and audio.",
   });

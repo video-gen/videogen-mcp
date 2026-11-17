@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { generateVideoClipInputSchema } from "./creativeToolContracts";
 import {
+  toDubVideoRequest,
   toGenerateAvatarRequest,
   toGenerateImageRequest,
   toGenerateMotionGraphicRequest,
@@ -143,6 +144,11 @@ void describe("media MCP adapters", () => {
       prompt: "Upbeat beauty ad music.",
       ...persistentSingleResult,
     });
+    assert.deepEqual(toGenerateMusicRequest({ prompt: "Gentle piano.", durationSeconds: 240 }), {
+      prompt: "Gentle piano.",
+      durationSeconds: 240,
+      ...persistentSingleResult,
+    });
     assert.deepEqual(
       toGenerateMotionGraphicRequest({
         prompt: "Animate the product name.",
@@ -210,5 +216,22 @@ void describe("media MCP adapters", () => {
       imageFileId: "vg_file_image",
       ...persistentSingleResultWithAutoWatermark,
     });
+  });
+
+  void it("maps dub inputs without result-count or watermark fields", () => {
+    assert.deepEqual(toDubVideoRequest({ videoFileId: "vg_file_video", targetLanguage: "es" }), {
+      videoFileId: "vg_file_video",
+      targetLanguage: "es",
+      isOutputTemporary: false,
+    });
+    assert.deepEqual(
+      toDubVideoRequest({ videoFileId: "vg_file_video", targetLanguage: "es", sourceLanguage: "en" }),
+      {
+        videoFileId: "vg_file_video",
+        targetLanguage: "es",
+        isOutputTemporary: false,
+        sourceLanguage: "en",
+      },
+    );
   });
 });

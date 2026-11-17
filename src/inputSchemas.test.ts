@@ -9,10 +9,10 @@ import {
   storyboardToVideoInputSchema,
 } from "./inputSchemas";
 
-describe("storyboard_to_video input schema", () => {
+void describe("storyboard_to_video input schema", () => {
   const schema = storyboardToVideoInputSchema;
 
-  it("requires the API's prompt field on every scene", () => {
+  void it("requires the API's prompt field on every scene", () => {
     const result = schema.safeParse({
       scenes: [
         {
@@ -25,7 +25,7 @@ describe("storyboard_to_video input schema", () => {
     assert.equal(result.success, false);
   });
 
-  it("accepts the documented storyboard scene fields", () => {
+  void it("accepts the documented storyboard scene fields", () => {
     const result = schema.safeParse({
       scenes: [
         {
@@ -57,16 +57,19 @@ describe("storyboard_to_video input schema", () => {
     }
   });
 
-  it("rejects video-only quality tiers that the storyboard API does not accept", () => {
+  void it("accepts Low opening-frame quality without an upgrade", () => {
     const result = schema.safeParse({
       scenes: [{ prompt: "A polished product reveal." }],
       quality: "LOW",
     });
 
-    assert.equal(result.success, false);
+    assert.equal(result.success, true);
+    if (result.success) {
+      assert.equal(result.data.quality, "LOW");
+    }
   });
 
-  it("strips removed raw API fields instead of rejecting the call", () => {
+  void it("strips removed raw API fields instead of rejecting the call", () => {
     const result = schema.safeParse({
       scenes: [{ prompt: "A polished product reveal." }],
       isOutputTemporary: true,
@@ -80,7 +83,7 @@ describe("storyboard_to_video input schema", () => {
     }
   });
 
-  it("strips unsupported nested scene fields instead of rejecting the call", () => {
+  void it("strips unsupported nested scene fields instead of rejecting the call", () => {
     const result = schema.safeParse({
       scenes: [{ prompt: "A polished product reveal.", unsupportedControl: true }],
     });
@@ -92,8 +95,8 @@ describe("storyboard_to_video input schema", () => {
   });
 });
 
-describe("generate_video_clip input schema", () => {
-  it("accepts reference-only generation and explicit nullable duration", () => {
+void describe("generate_video_clip input schema", () => {
+  void it("accepts reference-only generation and explicit nullable duration", () => {
     assert.equal(
       generateVideoClipInputSchema.safeParse({
         imageFileIds: ["vg_file_image"],
@@ -103,11 +106,11 @@ describe("generate_video_clip input schema", () => {
     );
   });
 
-  it("rejects requests without a prompt, spokenDialogue, or reference media", () => {
+  void it("rejects requests without a prompt, spokenDialogue, or reference media", () => {
     assert.equal(generateVideoClipInputSchema.safeParse({}).success, false);
   });
 
-  it("accepts an opening-frame still as the only input", () => {
+  void it("accepts an opening-frame still as the only input", () => {
     assert.equal(
       generateVideoClipInputSchema.safeParse({
         startFrameFileId: "vg_file_start",
@@ -116,7 +119,7 @@ describe("generate_video_clip input schema", () => {
     );
   });
 
-  it("accepts spokenDialogue as the only input", () => {
+  void it("accepts spokenDialogue as the only input", () => {
     assert.equal(
       generateVideoClipInputSchema.safeParse({
         spokenDialogue: "Meet your new everyday lip tint.",
@@ -125,7 +128,7 @@ describe("generate_video_clip input schema", () => {
     );
   });
 
-  it("accepts suppressBackgroundMusic", () => {
+  void it("accepts suppressBackgroundMusic", () => {
     assert.equal(
       generateVideoClipInputSchema.safeParse({
         prompt: "A product push-in.",
@@ -135,7 +138,7 @@ describe("generate_video_clip input schema", () => {
     );
   });
 
-  it("does not treat voiceDescription alone as enough input", () => {
+  void it("does not treat voiceDescription alone as enough input", () => {
     assert.equal(
       generateVideoClipInputSchema.safeParse({
         voiceDescription: "A warm, confident young woman's voice",
@@ -145,10 +148,10 @@ describe("generate_video_clip input schema", () => {
   });
 });
 
-describe("app deep-link action surfaces", () => {
+void describe("app deep-link action surfaces", () => {
   const commerceActions: ReadonlySet<string> = new Set(MCP_COMMERCE_DEEP_LINK_ACTIONS);
 
-  it("exposes ChatGPT exactly as STANDARD minus commerce actions", () => {
+  void it("exposes ChatGPT exactly as STANDARD minus commerce actions", () => {
     // ChatGPT Apps must not surface commerce deep links (Plugins digital-goods
     // policy). Locking this invariant means a new STANDARD action is either
     // classified as commerce (in MCP_COMMERCE_DEEP_LINK_ACTIONS) or must also be
@@ -160,13 +163,13 @@ describe("app deep-link action surfaces", () => {
     assert.deepEqual([...CHATGPT_APP_DEEP_LINK_ACTIONS], expectedChatGptActions);
   });
 
-  it("never lists a commerce action on the ChatGPT surface", () => {
+  void it("never lists a commerce action on the ChatGPT surface", () => {
     for (const action of CHATGPT_APP_DEEP_LINK_ACTIONS) {
       assert.equal(commerceActions.has(action), false);
     }
   });
 
-  it("does not advertise BILLING_SETTINGS on the ChatGPT destination field", () => {
+  void it("does not advertise BILLING_SETTINGS on the ChatGPT destination field", () => {
     const destination = getChatGptAppDeepLinkInputSchema.destination;
     const description =
       destination != null && "description" in destination && typeof destination.description === "string"
@@ -177,7 +180,7 @@ describe("app deep-link action surfaces", () => {
     assert.match(description, /app\.videogen\.io/);
   });
 
-  it("keeps every commerce action available on the STANDARD surface", () => {
+  void it("keeps every commerce action available on the STANDARD surface", () => {
     for (const action of MCP_COMMERCE_DEEP_LINK_ACTIONS) {
       assert.equal(STANDARD_APP_DEEP_LINK_ACTIONS.includes(action), true);
     }

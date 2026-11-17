@@ -2,7 +2,7 @@
 
 [![AllMCPs Verified](https://allmcps.com/api/badge/videogen-mcp)](https://allmcps.com/mcp/videogen-mcp?verify=39b87ccf-9cad-4bc2-b534-ee7e1218bc82)
 
-A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that exposes the full [VideoGen API](https://docs.videogen.io) to any MCP client (Cursor, Claude Desktop, Windsurf, etc.). Your agent can generate videos from scripts, produce images / voiceovers / music / avatars, upload files, export and remix projects, and manage runs — all authenticated with your own API key.
+A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that exposes the full [VideoGen API](https://docs.videogen.io) to any MCP client (Cursor, Claude Desktop, Windsurf, etc.). Your agent can generate videos from scripts, produce images / voiceovers / music / avatars, upload files, edit and export projects, and manage runs — all authenticated with your own API key.
 
 Learn more about the [VideoGen MCP server](https://videogen.io/videogen-mcp).
 
@@ -10,19 +10,28 @@ Find the hosted server on [Smithery](https://smithery.ai/servers/videogen/videog
 
 ## ChatGPT
 
-The hosted plugin includes a VideoGen home sidebar app (`open_home`). It follows
-the product home: the general creation prompt and suggestions, recent projects,
-example categories, featured workflows, reusable assets, and templates. Browsing
-does not start generation; Start sends the draft into a ChatGPT conversation.
-Project and library links open the matching VideoGen environment.
+The hosted plugin's `open_home` embeds the entire existing VideoGen frontend at
+`/chatgpt/`. Its normal navigation, composers, assistants, example actions,
+account dialogs, onboarding, media library and editor remain available. The
+wrapper contains no replacement product UI and does not redirect app actions
+into ChatGPT. The existing MCP tool connection remains available independently.
 
-The home catalog is generated from the same helpers as `frontend/` and committed
-in `web/homeCatalog.ts`, keeping the standalone MCP/npm/Docker build independent
-of internal packages. After changing the product catalog, refresh it from the
-repo root with `cd api && node --import tsx scripts/generate-chatgpt-home.ts`
-(with current base/defs/static JS builds). `build:js` bundles the page alongside
-the existing upload and preview widgets. Deploy MCP and rescan the existing
-plugin before expecting the sidebar entry to be available in ChatGPT.
+An origin- and source-checked bridge adds selected-project model context and host
+safe-area handling. Auth credentials never cross it. Sign-in uses the existing
+screens and methods with an isolated iframe session. Only the dedicated route
+permits ChatGPT and VideoGen's declared sandbox as ancestors. MCP allows frames
+from the matching deployment's app origin only. The iframe permission needs a
+submission justification: it reuses VideoGen's first-party application.
+Third-party sign-in and payment behavior must be verified in the actual host.
+
+Deploy **frontend and MCP** through the normal release process, then rescan the
+plugin. The new home resource URI avoids incompatible cached widget HTML. Run
+actual ChatGPT sign-in, project editing and export QA before submitting 2.5.3.
+The separate ChatGPT attachment uploader retains its device picker and optional
+ChatGPT library action.
+The MCP discovery icon uses the dedicated, vertically centered
+`website/public/logos/logo-mcp.svg`; release that website asset with the metadata
+change and refresh the connection so ChatGPT imports the new icon URL.
 
 Home-specific checks (no browser or live account required):
 
@@ -102,13 +111,13 @@ Runs as a subprocess launched by your client with `npx`. Reads the API key from 
 
 ### Environment variables
 
-| Variable            | Required   | Default                   | Description                                                                                          |
-| ------------------- | ---------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `VIDEOGEN_API_KEY`  | local only | —                         | Your VideoGen API key (local server). On the remote server the key travels in the `Authorization` header instead. |
-| `VIDEOGEN_BASE_URL` | no         | `https://api.videogen.io` | Override the upstream API base URL (e.g. for local development). Applies to both transports. When unset, the remote server resolves the upstream API per deployment environment (dev/prerelease/prod); local runs default to the public prod API. |
-| `VIDEOGEN_OAUTH_ISSUER` | no     | —                         | Remote server only. Full OAuth 2.1 issuer URL. When set (or derived from the var below), the server advertises OAuth protected-resource metadata (RFC 9728) and a `resource_metadata` 401 challenge so MCP clients can discover the authorization server and run account linking. Must match the issuer that the upstream API (`VIDEOGEN_BASE_URL`) validates tokens against. |
-| `VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL` | no | —             | Remote server only. Supabase project base URL; the issuer is derived as `${url}/auth/v1`. Ignored when `VIDEOGEN_OAUTH_ISSUER` is set. |
-| `VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN` | no | —            | Remote server only. Internal-testing OpenAI Plugins / ChatGPT Apps domain-verification token for the public plugin. When set, `GET /.well-known/openai-apps-challenge` returns that exact value as `text/plain`. When unset, that path is a non-JSON-RPC 404. |
+| Variable                               | Required   | Default                   | Description                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------- | ---------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VIDEOGEN_API_KEY`                     | local only | —                         | Your VideoGen API key (local server). On the remote server the key travels in the `Authorization` header instead.                                                                                                                                                                                                                                                             |
+| `VIDEOGEN_BASE_URL`                    | no         | `https://api.videogen.io` | Override the upstream API base URL (e.g. for local development). Applies to both transports. When unset, the remote server resolves the upstream API per deployment environment (dev/prerelease/prod); local runs default to the public prod API.                                                                                                                             |
+| `VIDEOGEN_OAUTH_ISSUER`                | no         | —                         | Remote server only. Full OAuth 2.1 issuer URL. When set (or derived from the var below), the server advertises OAuth protected-resource metadata (RFC 9728) and a `resource_metadata` 401 challenge so MCP clients can discover the authorization server and run account linking. Must match the issuer that the upstream API (`VIDEOGEN_BASE_URL`) validates tokens against. |
+| `VIDEOGEN_OAUTH_SUPABASE_PROJECT_URL`  | no         | —                         | Remote server only. Supabase project base URL; the issuer is derived as `${url}/auth/v1`. Ignored when `VIDEOGEN_OAUTH_ISSUER` is set.                                                                                                                                                                                                                                        |
+| `VIDEOGEN_OPENAI_APPS_CHALLENGE_TOKEN` | no         | —                         | Remote server only. Internal-testing OpenAI Plugins / ChatGPT Apps domain-verification token for the public plugin. When set, `GET /.well-known/openai-apps-challenge` returns that exact value as `text/plain`. When unset, that path is a non-JSON-RPC 404.                                                                                                                 |
 
 ## Tools
 
@@ -116,15 +125,21 @@ See the [callable tool reference](./TOOL_SCHEMAS.md) and [complete input/output 
 
 ### Workflows (end-to-end video)
 
-`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `list_workflow_runs`, `get_workflow_run`, `cancel_workflow_run`
+`script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`, `translate_video`, `list_workflow_runs`, `get_workflow_run`, `cancel_workflow_run`
 
 ### Media tools
 
-`generate_image`, `generate_video_clip`, `text_to_speech`, `generate_sound_effect`, `generate_music`, `generate_avatar`, `vectorize_image`, `remove_image_background`, `remove_video_background`, `upscale_image`, `upscale_video`, `image_3d_effect`, `list_tool_executions`, `get_tool_execution`, `cancel_tool_execution`
+`generate_image`, `generate_video_clip`, `text_to_speech`, `generate_sound_effect`, `generate_music`, `generate_avatar`, `vectorize_image`, `remove_image_background`, `remove_video_background`, `upscale_image`, `upscale_video`, `dub_video`, `image_3d_effect`, `list_tool_executions`, `get_tool_execution`, `cancel_tool_execution`
 
 ### Projects
 
-`list_projects`, `get_project`, `export_project`, `get_project_export`, `remix_project`, `list_project_remix_actions`
+`list_projects`, `get_project`, `export_project`, `get_project_export`, `start_video_edits`, `list_video_edits`
+
+### Project assistant
+
+`start_assistant_chat`, `get_assistant`, `send_assistant_message`, `get_assistant_message`, `act_on_assistant_action`
+
+Delegate project work to the same durable assistant used in the app. Reuse `get_project.assistantId` for existing API-created projects; starting a chat creates a new project. Writes return immediately with a `messageId` to poll. Approvals require an explicit decision and a returned action with `requiresApp: false`; app-only actions stay in the embedded app. Dashboard-created projects remain outside the assistant API's existing access boundary. Assistant replies and action acknowledgments do not themselves prove that generation or edits finished.
 
 ### Files
 
@@ -136,7 +151,7 @@ See the [callable tool reference](./TOOL_SCHEMAS.md) and [complete input/output 
 
 `list_entities`, `create_entity`, `get_entity`, `update_entity`, `archive_entity`, `add_entity_reference`, `remove_entity_reference`
 
-Create ACTOR / PRODUCT / VISUAL_STYLE entities, attach uploaded image references, then pass `vg_enti_...` ids into workflows and `generate_avatar` (`actorEntityId`; on `storyboard_to_video`, per-scene `productEntityIds` / `actorEntityIds` / `visualStyleEntityId`).
+Create ACTOR / PRODUCT / VISUAL*STYLE entities, attach uploaded image references, then pass `vg_enti*...`ids into workflows and`generate_avatar` (`actorEntityId`; on `storyboard_to_video`, per-scene `productEntityIds`/`actorEntityIds`/`visualStyleEntityId`).
 
 ### Resources & account
 
@@ -146,16 +161,16 @@ Create ACTOR / PRODUCT / VISUAL_STYLE entities, attach uploaded image references
 
 Operational manuals exposed as MCP resources and mirror tools (no API credential required):
 
-| Resource URI | Mirror tool |
-| --- | --- |
-| `guidance://getting-started` | `get_getting_started_guidance` |
-| `guidance://async-tasks` | `get_async_tasks_guidance` |
-| `guidance://workflows` | `get_workflows_guidance` |
+| Resource URI                    | Mirror tool                       |
+| ------------------------------- | --------------------------------- |
+| `guidance://getting-started`    | `get_getting_started_guidance`    |
+| `guidance://async-tasks`        | `get_async_tasks_guidance`        |
+| `guidance://workflows`          | `get_workflows_guidance`          |
 | `guidance://tools-vs-workflows` | `get_tools_vs_workflows_guidance` |
 
-Call the matching `get_*_guidance` tool before non-trivial setup, polling, workflow/remix/export, or tools-vs-workflows decisions. Many hosts never auto-attach resources; the tools are the reliable path. Content is grounded in the public docs at [docs.videogen.io](https://docs.videogen.io) but written for MCP tool usage (including hosted wait caps).
+Call the matching `get_*_guidance` tool before non-trivial setup, polling, workflow/video-edits/export, or tools-vs-workflows decisions. Many hosts never auto-attach resources; the tools are the reliable path. Content is grounded in the public docs at [docs.videogen.io](https://docs.videogen.io) but written for MCP tool usage (including hosted wait caps).
 
-Creative MCP tools expose user intent rather than the lower-level developer API request shape. Use `style` for a full, strict visual-style paragraph (medium, texture, palette, then a simple composition lock) and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }`) for output dimensions. Omitted workflow styles use the app Realistic look (`Photorealistic photograph, natural lighting`). Do not pass a short label such as `watercolor`. Image models pack the frame with text, charts, and diagrams unless the style keeps the picture simple. `remix_project` accepts curated `edits`: `CAPTIONS`, `TRANSITIONS`, `CONVERT_IMAGES_TO_VIDEOS`, and `ZOOM`. `CONVERT_IMAGES_TO_VIDEOS` generates AI video clips from stills (expensive). `ZOOM` is cheap Ken Burns camera motion. `watermarkMode` and `endScreenMode` are not exposed; MCP always sends `AUTO` (Free-plan output includes the VideoGen watermark; VideoGen Pro removes it).
+Creative MCP tools expose user intent rather than the lower-level developer API request shape. Use `style` for a full, strict visual-style paragraph (medium, texture, palette, then a simple composition lock) and `aspectRatio` (`{ width, height }` units, e.g. `{ width: 16, height: 9 }`) for output dimensions. Omitted workflow styles use the app Realistic look (`Photorealistic photograph, natural lighting`). Do not pass a short label such as `watercolor`. Image models pack the frame with text, charts, and diagrams unless the style keeps the picture simple. `start_video_edits` takes an explicit `editableVideoId` and ordered `videoEdits` objects from the public operation schema, including `ENABLE_CAPTIONS`, `ADD_TRANSITIONS`, `CONVERT_IMAGES_TO_VIDEOS`, and `ADD_ZOOM`. `CONVERT_IMAGES_TO_VIDEOS` generates AI video clips from stills (expensive). `ADD_ZOOM` is cheap Ken Burns camera motion. `watermarkMode` and `endScreenMode` are not exposed; MCP always sends `AUTO` (Free-plan output includes the VideoGen watermark; VideoGen Pro removes it).
 
 Workflow, media-generation, and export tools start the operation and poll internally. On the **hosted** (Streamable HTTP) server, the wait window is capped under Cloudflare's proxy timeout, so long generations return a still-running snapshot instead of a 524. Use `get_tool_execution`, `get_workflow_run`, or `get_project_export` to continue polling.
 
@@ -220,3 +235,11 @@ After deploying the remote MCP server for an environment (e.g. DEV → `https://
 5. Start a **new** conversation, select the app from the tools menu, and call a read tool (e.g. `get_me`). Do not reuse an old chat after metadata changes.
 
 STANDARD_TESTS runs anonymous ChatGPT discovery against `/mcp/chatgpt` automatically via `mcp-http` (`pnpm --filter @videogen/api mcp:test -- --transport http --env <env> --server-mode remote`), which invokes the Inspector CLI before the authenticated full smoke and asserts `open_uploader` advertises `noauth` and API tools advertise `oauth2`. That scheme check fails against a host that has not yet been redeployed with this metadata.
+
+### Native credit payments
+
+The `/mcp` endpoint and the stdio server expose `get_billing_account`, `create_billing_order`, `get_billing_order`, `complete_billing_order`, `cancel_billing_order` and `request_billing_refund`. API keys automatically inherit their owner's team billing permissions without a separate per-key cap or expiry. OAuth billing is off by default; in VideoGen developer settings, the integration owner can enable read-only access or credit purchase access with a USD limit and expiry. Only eligible active subscribers can buy credit packs; direct subscriptions are unavailable. Live native purchases remain disabled pending financial and host acceptance testing.
+
+Show the complete quoted terms and obtain explicit approval before completion. Completion has no payment-token argument. A compatible wallet supplies `{paymentToken}` in request `_meta["com.videogen/payment"]`, and the server forwards it only to the VideoGen API. This is a VideoGen-specific contract, not a standard MCP feature, and support depends on your host. Never ask users to paste credentials. Hosts must protect this metadata from prompts, logs, traces and ordinary tool content.
+
+Check the original order after uncertainty; never create a second payment to recover it. `requires_action` returns a signed-in VideoGen verification continuation. `paid_pending_fulfillment` is distinct from `fulfilled`. Cancellation affects unpaid orders; refunds are support-reviewed requests. The ChatGPT app endpoint (`/mcp/chatgpt`) does not offer these tools and rejects direct calls to them.

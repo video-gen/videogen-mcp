@@ -2,8 +2,8 @@
  * Prints the HOSTED ChatGPT Apps tool surface — every descriptor `tools/list`
  * returns on `/mcp/chatgpt` — as JSON on stdout.
  *
- * Release tooling only: `api/scripts/publish-chatgpt-app.ts` spawns this to
- * detect whether the tool surface changed since the ChatGPT app was last
+ * Release tooling only: `api/scripts/publish-chatgpt-plugin.ts` spawns this to
+ * detect whether the tool surface changed since the ChatGPT plugin was last
  * updated by hand. It is deliberately NOT a tsup entry, so it never ships in
  * `dist` or on npm. Uses `CHATGPT_APP` host surface so commerce deep-link
  * actions stay out of the recorded Plugins directory submission.

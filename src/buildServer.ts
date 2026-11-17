@@ -1,11 +1,20 @@
+import { hideLegacyVideoEditTools } from "./legacyVideoEditDiscovery";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GetVideoGenClient } from "./client";
 import {
   type McpHostSurface,
   getServerInstructionsForHostSurface,
 } from "./hostSurface";
-import { type McpOAuthContext, HOSTED_PROXY_SAFE_MAX_WAIT_MS, createMcpOperations } from "./operations";
+import {
+  type McpOAuthContext,
+  HOSTED_PROXY_SAFE_MAX_WAIT_MS,
+  createMcpOperations,
+} from "./operations";
 import { registerTools } from "./registerTools";
+import {
+  observeMcpTools,
+  type McpToolAnalyticsObserver,
+} from "./toolAnalytics";
 
 export const SERVER_NAME = "videogen";
 export const SERVER_VERSION = "0.0.1";
@@ -41,7 +50,10 @@ export const OAUTH_SCOPES = ["email", "profile"] as const;
  * the way out — the location OpenAI's Apps SDK reads — see
  * `mirrorSecuritySchemesToTopLevel` in `http.ts`.
  */
-function advertiseOAuthSecuritySchemes(server: McpServer, scopes: readonly string[]): void {
+function advertiseOAuthSecuritySchemes(
+  server: McpServer,
+  scopes: readonly string[],
+): void {
   const securitySchemes = [{ type: "oauth2", scopes: [...scopes] }];
   const originalRegisterTool = server.registerTool.bind(server);
 
@@ -91,6 +103,7 @@ export function buildMcpServer(
   abortSignal: AbortSignal | null,
   hasCredentials: boolean,
   hostSurface: McpHostSurface = "STANDARD",
+  observeToolCall: McpToolAnalyticsObserver | null = null,
 ): McpServer {
   const server = new McpServer(
     {
@@ -98,11 +111,11 @@ export function buildMcpServer(
       version: SERVER_VERSION,
       title: "VideoGen",
       description:
-        "Create and edit videos from scripts, storyboards, voiceovers, and slides. Generate images, video clips, speech, music, and sound effects; manage reference assets and export finished MP4 videos.",
+        "AI video generator and AI video editor for product videos, UGC-style ads, and social media videos. Create text to video and image to video projects from scripts, storyboards, product photos, voiceovers, or slides. Reuse product, actor, and style references; add captions, transitions, or camera motion; export MP4 videos. Also generate standalone images, video clips, speech, music, and sound effects. Requires a VideoGen account; generation uses team credits.",
       websiteUrl: "https://videogen.io",
       icons: [
         {
-          src: "https://videogen.io/logos/logo-red.svg",
+          src: "https://videogen.io/logos/logo-mcp.svg",
           mimeType: "image/svg+xml",
           sizes: ["any"],
         },
@@ -115,6 +128,10 @@ export function buildMcpServer(
 
   if (oauthContext != null) {
     advertiseOAuthSecuritySchemes(server, oauthContext.scopes);
+  }
+
+  if (observeToolCall != null) {
+    observeMcpTools(server, observeToolCall);
   }
 
   registerTools(
@@ -131,5 +148,12 @@ export function buildMcpServer(
     hostSurface,
   );
 
+  const connect = server.connect.bind(server);
+  server.connect = async (transport) => {
+    const send = transport.send.bind(transport);
+    transport.send = (message, options) =>
+      send(hideLegacyVideoEditTools(message), options);
+    await connect(transport);
+  };
   return server;
 }

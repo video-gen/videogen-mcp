@@ -34,13 +34,14 @@ If this fails with 401, stop and fix auth before starting workflows or tools (th
 
 ### Step 3 — Pick the right surface
 
-| Goal | What to use |
-| --- | --- |
-| Full narrated multi-scene video (editable project plus MP4) | A workflow tool: prefer `script_to_video` for ~1 minute+ / informational text; use `storyboard_to_video` only for short shot lists (≤ 3 scenes unless the user asks for more); also `voiceover_to_video`, `slideshow_to_video`, `prompt_to_video_clip`, and `video_to_video` to restyle an existing video (an uploaded file or a public link). Wait for `downloadUrl`. |
-| One image, clip, voiceover, music, avatar, or transform | A media tool: `generate_image`, `generate_video_clip`, `text_to_speech`, etc. |
-| Reusable actor / product / visual style | `create_entity` + `add_entity_reference` (upload the image first), then pass `vg_enti_...` into workflows / `generate_avatar` |
-| Polish an existing project | `remix_project` with curated `edits` |
-| Download an MP4 from a workflow | Use `downloadUrl` on the succeeded workflow run (auto-export is on by default). Call `export_project` only if you set `autoExport: false`. |
+| Goal                                                        | What to use                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full narrated multi-scene video (editable project plus MP4) | A workflow tool: prefer `script_to_video` for ~1 minute+ / informational text; use `storyboard_to_video` only for short shot lists (≤ 3 scenes unless the user asks for more); also `voiceover_to_video`, `slideshow_to_video`, `prompt_to_video_clip`, `video_to_video` to restyle an existing video (an uploaded file or a public link), and `translate_video` to translate an uploaded video's speech into other languages (one editable video per language). Wait for `downloadUrl`. |
+| One image, clip, voiceover, music, avatar, or transform     | A media tool: `generate_image`, `generate_video_clip`, `text_to_speech`, etc.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Reusable actor / product / visual style                     | `create_entity` + `add_entity_reference` (upload the image first), then pass `vg_enti_...` into workflows / `generate_avatar`                                                                                                                                                                                                                                                                                                                                                            |
+| Polish an existing project                                  | `start_video_edits` with `editableVideoId` and ordered `videoEdits`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Project work beyond dedicated MCP tools                     | Use VideoGen's in-app assistant through `send_assistant_message` on the existing `assistantId`, or `start_assistant_chat` for a new project. See the assistant section below.                                                                                                                                                                                                                                                                                                            |
+| Download an MP4 from a workflow                             | Use `downloadUrl` on the succeeded workflow run (auto-export is on by default). Call `export_project` only if you set `autoExport: false`.                                                                                                                                                                                                                                                                                                                                               |
 
 When unsure between workflow vs tool, call `get_tools_vs_workflows_guidance`. When unsure **which** workflow (especially script vs storyboard), call `get_workflows_guidance` and **ask the user** with short pros/cons before spending credits.
 
@@ -58,18 +59,30 @@ Use the **TypeScript / Python SDK** or REST API directly when building a product
 
 A separate **documentation-only** MCP at `https://docs.videogen.io/_mcp/server` answers questions about the docs. It does not execute API calls. This server does.
 
+## VideoGen's in-app assistant
+
+These tools use the same persisted project chats and assistant runner as the app. The embedded app keeps its normal behavior; this connection adds a way for ChatGPT to delegate project work without needing browser control.
+
+1. For an existing project, call `get_project` and reuse its `assistantId`. Read `get_assistant` for context, then use `send_assistant_message`. For a genuinely new project, call `start_assistant_chat` once and retain its `assistantId`, `projectId`, `projectUrl`, and `messageId`.
+2. Preserve the user's request, constraints and references. Assistant turns can edit the project and spend team credits. Starting a chat does not add automatic generation intent; ask for generation only when the user requested it.
+3. Writes return immediately. Poll the returned `messageId` with `get_assistant_message` until terminal. Never send the request again just to check progress. After an uncertain write, inspect the existing chat or project before retrying; do not create a duplicate project.
+4. Inspect the reply's `actions`. Use `act_on_assistant_action` with the actual `actionId` and an explicit `APPROVE` or `REJECT` only when `requiresApp` is false and the decision is authorized by the user. An assistant suggestion alone is not user approval. For `requiresApp: true`, have the user complete that step in the same project in the embedded app using its `projectUrl`.
+5. Verify the result: a succeeded reply or action acknowledgment does not prove the underlying project edit or generation finished. Read the updated chat/project; if `generation.workflowRunId` is present, poll `get_workflow_run`, then preview or export the actual result.
+
+The existing assistant API supports API-created projects, including projects created through MCP. It rejects dashboard-created projects even if `get_project` returns an assistant id. Do not bypass this boundary, switch teams, or silently create a replacement project; explain the limitation and let the user use that project's assistant in the embedded app. Older API projects may have no assistant id. Message inputs accept text, not new attachments; do not claim that naming a file attaches it. These tools do not provide arbitrary browser control, every UI action, or an assistant cancellation endpoint.
+
 ---
 
 ## ID conventions
 
 All ids are prefixed strings. Store them as-is; do not parse them.
 
-| Prefix | Meaning |
-| --- | --- |
-| `vg_work_...` | Workflow run |
-| `vg_tool_...` | Tool execution |
-| `vg_proj_...` | Project |
-| `vg_file_...` | Uploaded file |
+| Prefix                      | Meaning                                                  |
+| --------------------------- | -------------------------------------------------------- |
+| `vg_work_...`               | Workflow run                                             |
+| `vg_tool_...`               | Tool execution                                           |
+| `vg_proj_...`               | Project                                                  |
+| `vg_file_...`               | Uploaded file                                            |
 | `vg_expor_...` / export ids | Project export (use the id returned by `export_project`) |
 
 Numeric timestamps from the API are **seconds** since the Unix epoch (UTC), not milliseconds.
@@ -81,6 +94,7 @@ Numeric timestamps from the API are **seconds** since the Unix epoch (UTC), not 
 Many flows need a prior upload (voiceover audio, slideshow PDF, logo, reference images):
 
 <!-- mcp-host-upload-guidance -->
+
 - **ChatGPT (hosted)**: call `open_uploader`. When the user already attached files in the chat, pass them in `files`. A filename is not the file and does not upload it.
 - **Hosted remote**: `upload_file` with inline base64 for small files, or `create_file_upload` then `PUT` bytes to the returned URL, then `get_file` with `wait: true`.
 - **Local stdio**: `upload_file` with a local `filePath`.
@@ -89,6 +103,17 @@ Many flows need a prior upload (voiceover audio, slideshow PDF, logo, reference 
 Pass the resulting `vg_file_...` into workflow or tool arguments.
 
 ---
+
+## Public video links
+
+Before generating from an external video link, use `import_video_from_url` and
+poll its `fileImportId` with `get_video_url_import`. An unresolved multi-video
+source returns `selection` with up to 20 numbered entries. Ask which video the
+user wants; import that same `selection.sourceUrl` with its `videoIndex`, then
+pass the successful `fileId` to `video_to_video` as `videoFileId`. Importing does
+not start generation. Keep genuine unavailable/private-source errors distinct
+from a request to choose a video, and do not retry an unchanged source just to
+hide a failure.
 
 ## Entities (actors, products, visual styles)
 
@@ -104,11 +129,13 @@ Also: `list_entities`, `get_entity`, `update_entity`, `remove_entity_reference`,
 ---
 
 <!-- mcp-host-credits-guidance -->
+
 ## Credits and product UI
 
 Generation spends team credits. When a tool fails for credits or plan access, be direct: call `get_app_deep_link` with `OPEN_UPGRADE`, `OPEN_PURCHASE_CREDITS`, or `OPEN_ENABLE_TOP_UPS` as appropriate, return that URL, and walk the user into the flow in the VideoGen app. Do not claim MCP can change billing inline.
 
 MCP never exposes `watermarkMode` or `endScreenMode`. Every generation and export uses `AUTO`: Free-plan results include the VideoGen watermark (and a short "Made with VideoGen" end screen on project exports). Removing that branding requires VideoGen Pro. If the user wants watermark-free output, call `get_app_deep_link` with `OPEN_UPGRADE` and walk them into Pro. After they upgrade, keep using MCP as-is; `AUTO` then omits branding. Do not invent those parameters or tell the user to change a workspace watermark setting.
+
 <!-- /mcp-host-credits-guidance -->
 
 ---
@@ -117,6 +144,6 @@ MCP never exposes `watermarkMode` or `endScreenMode`. Every generation and expor
 
 1. Run a workflow (creates a project). Default `autoExport` waits for an MP4.
 2. Give the user `downloadUrl` when status is `succeeded`.
-3. Optionally set `autoExport: false`, then `remix_project`, then `export_project`, if polish must appear in the MP4.
+3. Optionally set `autoExport: false`, then `start_video_edits`, then `export_project`, if polish must appear in the MP4.
 
 Full detail: `get_workflows_guidance`.

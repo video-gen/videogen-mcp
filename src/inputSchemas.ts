@@ -1,6 +1,7 @@
 import { z } from "zod";
 export {
   exportProjectInputSchema,
+  dubVideoInputSchema,
   generateAvatarInputSchema,
   generateImageInputSchema,
   generateMotionGraphicInputSchema,
@@ -10,12 +11,14 @@ export {
   image3dEffectInputSchema,
   promptToVideoClipInputSchema,
   remixProjectInputSchema,
+  startVideoEditsInputSchema,
   removeImageBackgroundInputSchema,
   removeVideoBackgroundInputSchema,
   scriptToVideoInputSchema,
   slideshowToVideoInputSchema,
   storyboardToVideoInputSchema,
   textToSpeechInputSchema,
+  translateVideoInputSchema,
   upscaleImageInputSchema,
   upscaleVideoInputSchema,
   vectorizeImageInputSchema,
@@ -48,7 +51,11 @@ export const aspectRatioSchema = z.object({
   height: z.number().positive(),
 });
 
-const projectIdField = z.string().describe("Editable project to inspect. Use projectId from a workflow result or list_projects.");
+const projectIdField = z
+  .string()
+  .describe(
+    "Editable project to inspect. Use projectId from a workflow result or list_projects.",
+  );
 
 const uploadFileTypeField = z
   .enum(["IMAGE", "VIDEO", "AUDIO"])
@@ -114,7 +121,9 @@ const buildAppDeepLinkInputSchema = ({
   articleSlug: z
     .string()
     .optional()
-    .describe("Required for OPEN_HELP_ARTICLE. Help-center search text, such as an article title or its URL slug; the link opens matching search results."),
+    .describe(
+      "Required for OPEN_HELP_ARTICLE. Help-center search text, such as an article title or its URL slug; the link opens matching search results.",
+    ),
   provider: z
     .string()
     .optional()
@@ -132,17 +141,23 @@ const buildAppDeepLinkInputSchema = ({
     .enum(["bug", "feature_request", "improvement"])
     .nullable()
     .optional()
-    .describe("Feedback classification for OPEN_SUBMIT_FEEDBACK. Omit or pass null to let the user choose."),
+    .describe(
+      "Feedback classification for OPEN_SUBMIT_FEEDBACK. Omit or pass null to let the user choose.",
+    ),
   text: z
     .string()
     .nullable()
     .optional()
-    .describe("Optional for OPEN_SUBMIT_FEEDBACK. Prefills the ticket description (capped)."),
+    .describe(
+      "Optional for OPEN_SUBMIT_FEEDBACK. Prefills the ticket description (capped).",
+    ),
   suggestedLocale: z
     .string()
     .nullable()
     .optional()
-    .describe("For OPEN_LANGUAGE_SELECTOR, preselect a UI language using an app locale code such as en or es. Unsupported codes are ignored. The user can choose another language."),
+    .describe(
+      "For OPEN_LANGUAGE_SELECTOR, preselect a UI language using an app locale code such as en or es. Unsupported codes are ignored. The user can choose another language.",
+    ),
 });
 
 export const getAppDeepLinkInputSchema = buildAppDeepLinkInputSchema({
@@ -164,7 +179,11 @@ export const listProjectsInputSchema = {
 export const getProjectInputSchema = { projectId: projectIdField };
 
 export const getProjectExportInputSchema = {
-  projectId: z.string().describe("Project that owns the export. Use the same projectId passed to export_project, obtained from a workflow result or list_projects."),
+  projectId: z
+    .string()
+    .describe(
+      "Project that owns the export. Use the same projectId passed to export_project, obtained from a workflow result or list_projects.",
+    ),
   exportId: z.string().describe("Export id (vg_expo_...) from export_project."),
 };
 
@@ -177,7 +196,11 @@ export const listWorkflowRunsInputSchema = {
 };
 
 export const getWorkflowRunInputSchema = {
-  workflowRunId: z.string().describe("Run to inspect or cancel. Use workflowRunId from a workflow start result or list_workflow_runs."),
+  workflowRunId: z
+    .string()
+    .describe(
+      "Run to inspect or cancel. Use workflowRunId from a workflow start result or list_workflow_runs.",
+    ),
 };
 
 export const cancelWorkflowRunInputSchema = getWorkflowRunInputSchema;
@@ -189,7 +212,11 @@ export const listToolExecutionsInputSchema = {
 };
 
 export const getToolExecutionInputSchema = {
-  toolExecutionId: z.string().describe("Execution to inspect or cancel. Use toolExecutionId from a media-tool start result or list_tool_executions."),
+  toolExecutionId: z
+    .string()
+    .describe(
+      "Execution to inspect or cancel. Use toolExecutionId from a media-tool start result or list_tool_executions.",
+    ),
 };
 
 export const cancelToolExecutionInputSchema = getToolExecutionInputSchema;
@@ -207,7 +234,9 @@ export const listTtsVoicesInputSchema = {
   includeDeprecatedVoices: z
     .boolean()
     .optional()
-    .describe("Whether to include older voices that remain callable. Omit to exclude deprecated voices."),
+    .describe(
+      "Whether to include older voices that remain callable. Omit to exclude deprecated voices.",
+    ),
   query: catalogueQueryField,
 };
 
@@ -216,21 +245,39 @@ export const listLanguagesInputSchema = {
 };
 
 const entityTypeField = z
-  .enum(["ACTOR", "PRODUCT", "VISUAL_STYLE", "SLIDESHOW_THEME", "BRAND", "LOCATION", "PROP"])
+  .enum([
+    "ACTOR",
+    "PRODUCT",
+    "VISUAL_STYLE",
+    "SLIDESHOW_THEME",
+    "BRAND",
+    "LOCATION",
+    "PROP",
+  ])
   .describe(
     "ACTOR = consistent character; PRODUCT = a product the user sells or promotes; VISUAL_STYLE = look/style for generated images; SLIDESHOW_THEME = shared slide design system for a slideshow deck; BRAND = logo, style guide image, and writing style; LOCATION = consistent place or set; PROP = background object that is not a product. Anything the user sells is a PRODUCT, never a PROP.",
   );
 
-const entityIdField = z.string().describe("Saved reference entity to use. Obtain entityId from list_entities or create_entity.");
+const entityIdField = z
+  .string()
+  .describe(
+    "Saved reference entity to use. Obtain entityId from list_entities or create_entity.",
+  );
 
 const entityBrandConfigField = z.object({
   fonts: z.string().describe("Font guidance for a BRAND entity."),
-  colors: z.string().describe("Color guidance, including hex codes when available."),
-  writingStyle: z.string().describe("Voice and tone for spoken and on-screen copy."),
+  colors: z
+    .string()
+    .describe("Color guidance, including hex codes when available."),
+  writingStyle: z
+    .string()
+    .describe("Voice and tone for spoken and on-screen copy."),
 });
 
 export const listEntitiesInputSchema = {
-  entityType: entityTypeField.optional().describe("When set, only return entities of this type."),
+  entityType: entityTypeField
+    .optional()
+    .describe("When set, only return entities of this type."),
   cursor: cursorField,
   limit: limitField,
 };
@@ -238,8 +285,15 @@ export const listEntitiesInputSchema = {
 export const createEntityInputSchema = {
   entityType: entityTypeField,
   name: z.string().min(1).describe("Display name for the entity."),
-  description: z.string().optional().describe("Describe the subject, product, setting, or visual identity this saved entity represents."),
-  brandConfig: entityBrandConfigField.optional().describe("Configuration for a BRAND entity."),
+  description: z
+    .string()
+    .optional()
+    .describe(
+      "Describe the subject, product, setting, or visual identity this saved entity represents.",
+    ),
+  brandConfig: entityBrandConfigField
+    .optional()
+    .describe("Configuration for a BRAND entity."),
 };
 
 export const getEntityInputSchema = {
@@ -248,8 +302,15 @@ export const getEntityInputSchema = {
 
 export const updateEntityInputSchema = {
   entityId: entityIdField,
-  name: z.string().min(1).optional().describe("New display name. Omit to leave unchanged."),
-  description: z.string().optional().describe("New description. Omit to leave unchanged."),
+  name: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("New display name. Omit to leave unchanged."),
+  description: z
+    .string()
+    .optional()
+    .describe("New description. Omit to leave unchanged."),
   brandConfig: entityBrandConfigField
     .optional()
     .describe("Complete replacement configuration for a BRAND entity."),
@@ -266,7 +327,10 @@ export const addEntityReferenceInputSchema = {
     .describe(
       "Image file id (vg_file_...) to attach as a reference. Upload first via upload_file / create_file_upload / open_uploader.",
     ),
-  description: z.string().optional().describe("Optional description of this reference image."),
+  description: z
+    .string()
+    .optional()
+    .describe("Optional description of this reference image."),
   role: z
     .enum(["REFERENCE", "BRAND_LOGO", "BRAND_STYLE_GUIDE"])
     .optional()
@@ -276,12 +340,16 @@ export const addEntityReferenceInputSchema = {
   isDefault: z
     .boolean()
     .optional()
-    .describe("When true, make this the primary reference (thumbnail). Defaults to false."),
+    .describe(
+      "When true, make this the primary reference (thumbnail). Defaults to false.",
+    ),
 };
 
 export const removeEntityReferenceInputSchema = {
   entityId: entityIdField,
-  fileId: z.string().describe("Reference image file id (vg_file_...) to remove."),
+  fileId: z
+    .string()
+    .describe("Reference image file id (vg_file_...) to remove."),
 };
 
 export const uploadFileLocalInputSchema = {
@@ -289,22 +357,37 @@ export const uploadFileLocalInputSchema = {
   displayName: z
     .string()
     .optional()
-    .describe("Human-readable label used to identify the uploaded asset in the VideoGen library. Defaults to the source file name."),
+    .describe(
+      "Human-readable label used to identify the uploaded asset in the VideoGen library. Defaults to the source file name.",
+    ),
   type: uploadFileTypeField,
 };
 
 export const uploadFileHostedInputSchema = {
-  fileData: z.string().describe("Base64-encoded contents of the file to upload."),
-  displayName: z.string().optional().describe("Human-readable label used to identify the uploaded asset in the VideoGen library. Defaults to 'upload'."),
+  fileData: z
+    .string()
+    .describe("Base64-encoded contents of the file to upload."),
+  displayName: z
+    .string()
+    .optional()
+    .describe(
+      "Human-readable label used to identify the uploaded asset in the VideoGen library. Defaults to 'upload'.",
+    ),
   type: uploadFileTypeField,
 };
 
 export const createFileUploadInputSchema = {
-  displayName: z.string().describe("Human-readable label used to identify the uploaded asset in the VideoGen library."),
+  displayName: z
+    .string()
+    .describe(
+      "Human-readable label used to identify the uploaded asset in the VideoGen library.",
+    ),
   type: z
     .enum(["IMAGE", "VIDEO", "AUDIO", "PDF", "SLIDESHOW"])
     .optional()
-    .describe("Media or document kind to associate with the upload. Inferred after processing when omitted."),
+    .describe(
+      "Media or document kind to associate with the upload. Inferred after processing when omitted.",
+    ),
   isTemporary: z
     .boolean()
     .optional()
@@ -314,7 +397,11 @@ export const createFileUploadInputSchema = {
 };
 
 export const getFileInputSchema = {
-  fileId: z.string().describe("Asset to fetch. Use fileId from upload_file, create_file_upload, list_files, or a generation result."),
+  fileId: z
+    .string()
+    .describe(
+      "Asset to fetch. Use fileId from upload_file, create_file_upload, list_files, or a generation result.",
+    ),
   wait: z
     .boolean()
     .optional()
@@ -326,13 +413,17 @@ export const getFileInputSchema = {
     .int()
     .positive()
     .optional()
-    .describe("Time between readiness checks in milliseconds when wait is true. Omit to poll every 3000 milliseconds."),
+    .describe(
+      "Time between readiness checks in milliseconds when wait is true. Omit to poll every 3000 milliseconds.",
+    ),
   timeoutMs: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe("Maximum time to wait for processing before giving up, in milliseconds."),
+    .describe(
+      "Maximum time to wait for processing before giving up, in milliseconds.",
+    ),
 };
 
 export const listFilesInputSchema = { cursor: cursorField, limit: limitField };
@@ -347,10 +438,18 @@ export const openUploaderInputSchema = emptyInputSchema;
  * requires `additionalProperties: false` on this object.
  */
 export const chatgptAttachmentFileSchema = z.strictObject({
-  download_url: z.string().describe("Temporary download URL ChatGPT provides for this attachment."),
+  download_url: z
+    .string()
+    .describe("Temporary download URL ChatGPT provides for this attachment."),
   file_id: z.string().describe("ChatGPT file id for this attachment."),
-  mime_type: z.string().optional().describe("MIME type when ChatGPT provides one."),
-  file_name: z.string().optional().describe("File name when ChatGPT provides one."),
+  mime_type: z
+    .string()
+    .optional()
+    .describe("MIME type when ChatGPT provides one."),
+  file_name: z
+    .string()
+    .optional()
+    .describe("File name when ChatGPT provides one."),
 });
 
 export const openUploaderChatgptInputSchema = {
@@ -358,6 +457,13 @@ export const openUploaderChatgptInputSchema = {
     .array(chatgptAttachmentFileSchema)
     .optional()
     .describe(
-      "Photos or files the user attached in this chat. Pass every attachment. Omit this when nothing is attached yet and the user should pick the files in the uploader.",
+      "Only chat attachments the user selected for this VideoGen task. Omit to let the user pick files in the uploader.",
     ),
+};
+
+export const listVideoEditsInputSchema = {
+  projectId: projectIdField,
+  editableVideoId: z.string().optional(),
+  limit: limitField,
+  cursor: cursorField,
 };

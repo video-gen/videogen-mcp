@@ -3,6 +3,7 @@ import type {
   ScriptToVideoRequest,
   SlideshowToVideoRequest,
   StoryboardToVideoRequest,
+  TranslateVideoRequest,
   VideoToVideoRequest,
   VoiceoverToVideoRequest,
 } from "@videogen/sdk";
@@ -13,6 +14,7 @@ import {
   scriptToVideoInputSchema,
   slideshowToVideoInputSchema,
   storyboardToVideoInputSchema,
+  translateVideoInputSchema,
   videoToVideoInputSchema,
   voiceoverToVideoInputSchema,
 } from "./creativeToolContracts";
@@ -24,6 +26,7 @@ type SlideshowToVideoInput = z.infer<typeof slideshowToVideoInputSchema>;
 type StoryboardToVideoInput = z.infer<typeof storyboardToVideoInputSchema>;
 type PromptToVideoClipInput = z.infer<typeof promptToVideoClipInputSchema>;
 type VideoToVideoInput = z.infer<typeof videoToVideoInputSchema>;
+type TranslateVideoInput = z.infer<typeof translateVideoInputSchema>;
 
 const mcpWorkflowDefaults = {
   isOutputTemporary: false as const,
@@ -52,11 +55,16 @@ const mcpAutoExportFields = ({
   };
 };
 
-export function toScriptToVideoRequest(input: ScriptToVideoInput): ScriptToVideoRequest {
+export function toScriptToVideoRequest(
+  input: ScriptToVideoInput,
+): ScriptToVideoRequest {
   return {
     script: input.script,
     visualStyle: styleToVisualStyle({ style: input.style }),
     ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
@@ -74,6 +82,9 @@ export function toVoiceoverToVideoRequest(
     fileId: input.fileId,
     visualStyle: styleToVisualStyle({ style: input.style }),
     ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
@@ -87,6 +98,9 @@ export function toSlideshowToVideoRequest(
   return {
     fileId: input.fileId,
     ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.slideScripts != null && { slideScripts: input.slideScripts }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
@@ -106,17 +120,34 @@ export function toStoryboardToVideoRequest(
   return {
     scenes: input.scenes.map((scene) => ({
       prompt: scene.prompt,
-      ...(scene.voiceoverScript != null && { voiceoverScript: scene.voiceoverScript }),
+      ...(scene.voiceoverScript != null && {
+        voiceoverScript: scene.voiceoverScript,
+      }),
       ...(scene.title != null && { title: scene.title }),
-      ...(scene.durationSeconds != null && { durationSeconds: scene.durationSeconds }),
-      ...(scene.actorEntityIds != null && { actorEntityIds: scene.actorEntityIds }),
-      ...(scene.productEntityIds != null && { productEntityIds: scene.productEntityIds }),
-      ...(scene.visualStyleEntityId != null && { visualStyleEntityId: scene.visualStyleEntityId }),
+      ...(scene.durationSeconds != null && {
+        durationSeconds: scene.durationSeconds,
+      }),
+      ...(scene.actorEntityIds != null && {
+        actorEntityIds: scene.actorEntityIds,
+      }),
+      ...(scene.productEntityIds != null && {
+        productEntityIds: scene.productEntityIds,
+      }),
+      ...(scene.visualStyleEntityId != null && {
+        visualStyleEntityId: scene.visualStyleEntityId,
+      }),
     })),
-    ...(input.actorEntityIds != null && { actorEntityIds: input.actorEntityIds }),
-    ...(input.productEntityIds != null && { productEntityIds: input.productEntityIds }),
+    ...(input.actorEntityIds != null && {
+      actorEntityIds: input.actorEntityIds,
+    }),
+    ...(input.productEntityIds != null && {
+      productEntityIds: input.productEntityIds,
+    }),
     defaultGeneration: { aiStyle: input.style ?? DEFAULT_MCP_AI_STYLE },
     ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
@@ -129,26 +160,56 @@ export function toPromptToVideoClipRequest(
   return {
     prompt: input.prompt,
     ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
-    ...(input.durationSeconds != null && { durationSeconds: input.durationSeconds }),
+    ...(input.durationSeconds != null && {
+      durationSeconds: input.durationSeconds,
+    }),
     ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
   };
 }
 
-export function toVideoToVideoRequest(input: VideoToVideoInput): VideoToVideoRequest {
+export function toVideoToVideoRequest(
+  input: VideoToVideoInput,
+): VideoToVideoRequest {
   return {
     prompt: input.prompt,
     ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
     ...mcpAutoExportFields({ autoExport: input.autoExport }),
     ...(input.videoFileId != null && { videoFileId: input.videoFileId }),
     ...(input.videoUrl != null && { videoUrl: input.videoUrl }),
-    ...(input.trimStartSeconds != null && { trimStartSeconds: input.trimStartSeconds }),
-    ...(input.trimEndSeconds != null && { trimEndSeconds: input.trimEndSeconds }),
+    ...(input.trimStartSeconds != null && {
+      trimStartSeconds: input.trimStartSeconds,
+    }),
+    ...(input.trimEndSeconds != null && {
+      trimEndSeconds: input.trimEndSeconds,
+    }),
     ...(input.imageFileIds != null && { imageFileIds: input.imageFileIds }),
-    ...(input.aspectRatio != null && { aspectRatio: input.aspectRatio }),
     ...(input.quality != null && { quality: input.quality }),
     ...(input.audio != null && { audio: input.audio }),
+  };
+}
+
+export function toTranslateVideoRequest(
+  input: TranslateVideoInput,
+): TranslateVideoRequest {
+  return {
+    videoFileId: input.videoFileId,
+    outputLanguages: input.outputLanguages,
+    ...mcpWorkflowDefaults,
+    ...("videoEdits" in input && input.videoEdits != null
+      ? { videoEdits: input.videoEdits }
+      : {}),
+    ...mcpAutoExportFields({ autoExport: input.autoExport }),
+    ...(input.sourceLanguage != null && {
+      sourceLanguage: input.sourceLanguage,
+    }),
   };
 }

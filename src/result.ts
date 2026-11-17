@@ -5,6 +5,7 @@ import { buildMediaPageUrlForApiFileId } from "./mediaPageUrl";
 
 const errorMessageSchema = z.object({ message: z.string() });
 const statusCodeSchema = z.object({ statusCode: z.number() });
+const sdkStatusSchema = z.object({ status: z.number() });
 
 const getIsPlainJsonObject = (value: unknown): value is Record<string, unknown> => {
   return value != null && typeof value === "object" && !Array.isArray(value);
@@ -50,7 +51,7 @@ export function enrichStructuredContentWithAppMediaUrls(
   if (Array.isArray(next.results)) {
     next = {
       ...next,
-      results: next.results.map((result) => {
+      results: next.results.map((result: unknown) => {
         if (!getIsRecord(result)) {
           return result;
         }
@@ -226,8 +227,11 @@ export function authErrorResult({
 /** Extracts the HTTP status code from an SDK error, or null for non-HTTP errors. */
 export function getErrorStatusCode(err: unknown): number | null {
   const result = statusCodeSchema.safeParse(err);
-
-  return result.success ? result.data.statusCode : null;
+  if (result.success) {
+    return result.data.statusCode;
+  }
+  const sdkResult = sdkStatusSchema.safeParse(err);
+  return sdkResult.success ? sdkResult.data.status : null;
 }
 
 export function getErrorMessage(err: unknown): string {

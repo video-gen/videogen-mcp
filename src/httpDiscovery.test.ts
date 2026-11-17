@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 
 /**
@@ -135,8 +134,8 @@ function stopHttpServer(child: ChildProcess): void {
 
 function getToolSecuritySchemes(tool: {
   name: string;
-  securitySchemes?: unknown | undefined;
-  _meta?: { securitySchemes?: unknown | undefined } | undefined;
+  securitySchemes?: unknown;
+  _meta?: { securitySchemes?: unknown } | undefined;
 }): unknown {
   return tool.securitySchemes ?? tool._meta?.securitySchemes;
 }
@@ -247,7 +246,7 @@ void test("/mcp/chatgpt serves anonymous initialize + tools/list with correct se
 
     try {
       const transport = new StreamableHTTPClientTransport(new URL(chatgptUrl));
-      await client.connect(transport as Transport);
+      await client.connect(transport);
 
       const { tools } = await client.listTools();
       assert.ok(tools.length >= 30, `expected ≥30 tools, got ${tools.length}`);
@@ -498,3 +497,49 @@ void test("GET /.well-known/openai-apps-challenge is a non-JSON-RPC 404 when the
     stopHttpServer(child);
   }
 });
+
+for (const environment of [
+  {
+    name: "PROD",
+    baseUrl: "https://api.videogen.io",
+    appUrl: "https://app.videogen.io",
+  },
+  {
+    name: "PRERELEASE",
+    baseUrl: "https://prerelease.api.videogen.io",
+    appUrl: "https://prerelease.app.videogen.io",
+  },
+  {
+    name: "DEV",
+    baseUrl: "https://dev.api.videogen.io",
+    appUrl: "https://dev.app.videogen.io",
+  },
+]) {
+  void test(`browser fallback opens the ${environment.name} app while JSON discovery is preserved`, async () => {
+    const { child, origin } = await startHttpServer({
+      VIDEOGEN_BASE_URL: environment.baseUrl,
+    });
+    try {
+      const page = await fetch(origin, {
+        headers: { Accept: "text/html,application/xhtml+xml" },
+        redirect: "manual",
+      });
+      assert.equal(page.status, 302);
+      assert.equal(page.headers.get("location"), environment.appUrl);
+      assert.equal(page.headers.get("cache-control"), "no-store");
+      const discovery = await fetch(origin, {
+        headers: { Accept: "application/json" },
+      });
+      assert.equal(discovery.status, 200);
+      const body = z
+        .object({
+          endpoint: z.literal("/mcp"),
+          chatgptEndpoint: z.literal("/mcp/chatgpt"),
+        })
+        .parse(await discovery.json());
+      assert.equal(body.endpoint, "/mcp");
+    } finally {
+      stopHttpServer(child);
+    }
+  });
+}

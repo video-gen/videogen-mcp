@@ -1,9 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  UPLOAD_WIDGET_CSP,
   UPLOAD_WIDGET_URI,
   WIDGET_MIME_TYPE,
   buildWidgetResourceMeta,
+  getUploadWidgetCsp,
   getUploadWidgetHtml,
 } from "../appWidget";
 import type { McpHostSurface } from "../hostSurface";
@@ -35,7 +35,7 @@ function readAttachedFileCount(args: unknown): number {
 
 export function registerUploadWidget(server: McpServer, hostSurface: McpHostSurface): void {
   const resourceMeta = buildWidgetResourceMeta({
-    csp: UPLOAD_WIDGET_CSP,
+    csp: getUploadWidgetCsp(),
     widgetDescription:
       "Lets the user pick a file and upload it to VideoGen, then returns its file id.",
   });
@@ -65,7 +65,7 @@ export function registerUploadWidget(server: McpServer, hostSurface: McpHostSurf
       title: "Open uploader",
       description:
         hostSurface === "CHATGPT_APP"
-          ? "Import photos or other files into VideoGen. When the user already attached files in this chat, pass every attachment in files. A filename is not the file and does not upload it. If nothing is attached yet, call this with no arguments so the user can pick the files. The vg_file_ id is reported after the upload finishes."
+          ? "Import photos or other files the user selected for their VideoGen task. Pass only the chat attachments needed for the requested import in files. If the intended files are unclear, ask the user to choose. A filename does not upload a file. Omit files to open the picker. The vg_file_ id is reported after the upload finishes."
           : "Open an in-chat file uploader (ChatGPT only). The user picks a file, it is uploaded to VideoGen, and its file id (vg_file_...) is reported back for use in voiceover_to_video, slideshow_to_video, logos, or B-roll. Prefer this over asking the user to paste a link. On clients without in-chat UI, use upload_file (small files) or create_file_upload (large files) instead. Returns the uploader launch status; the file id arrives after the user completes the upload.",
       inputSchema: hostSurface === "CHATGPT_APP" ? openUploaderChatgptInputSchema : openUploaderInputSchema,
       outputSchema: openUploaderOutputSchema,

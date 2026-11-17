@@ -1,9 +1,9 @@
 import { StrictMode, useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
+import { initializeWidgetBridge } from "./initializeWidgetBridge";
 import {
-  isAllowedChatgptAttachmentDownloadUrl,
+  downloadChatgptAttachment,
   readChatgptAttachments,
-  readFreshDownloadUrl,
   uploadBytesToVideoGen,
   type ChatgptAttachment,
 } from "../src/chatgptAttachmentFiles";
@@ -26,7 +26,8 @@ import {
  *
  * The file input is an overlay, not `display: none`. iOS Safari ignores a
  * programmatic click on a hidden file input, so the tap has to hit the input
- * itself. When the host offers `selectFiles`, that picker is used instead.
+ * itself. ChatGPT's library picker is a separate optional action: it must never
+ * replace the device picker, which also recovers from attachment-download errors.
  */
 
 type UploadPhase = "idle" | "creating" | "uploading" | "processing" | "done" | "error";
@@ -135,18 +136,26 @@ function UploadWidget(): ReactElement {
       return;
     }
 
-    await host?.setWidgetState?.({
-      fileId: first.fileId,
-      fileIds: ids,
-      displayName: first.displayName,
-      status: "ready",
-    });
+    try {
+      await host?.setWidgetState?.({
+        fileId: first.fileId,
+        fileIds: ids,
+        displayName: first.displayName,
+        status: "ready",
+      });
+    } catch {
+      setErrorMessage("File uploaded. Copy its file ID below if ChatGPT cannot see it.");
+    }
 
     const listed = uploaded.map((file) => `${file.displayName}: ${file.fileId}`).join("\n");
 
-    await host?.sendFollowUpMessage?.({
-      prompt: `Uploaded ${uploaded.length} file(s) to VideoGen.\n${listed}\nUse these file ids for the next step.`,
-    });
+    try {
+      await host?.sendFollowUpMessage?.({
+        prompt: `Uploaded ${uploaded.length} file(s) to VideoGen.\n${listed}\nUse these file ids for the next step.`,
+      });
+    } catch {
+      setErrorMessage("File uploaded. Copy its file ID below into the conversation.");
+    }
   }, []);
 
   const uploadByteGroups = useCallback(
@@ -184,34 +193,14 @@ function UploadWidget(): ReactElement {
 
   const downloadAttachment = useCallback(async (attachment: ChatgptAttachment): Promise<ArrayBuffer | null> => {
     const host = window.openai;
-    let downloadUrl = attachment.downloadUrl;
-
-    if (host?.getFileDownloadUrl != null) {
-      try {
-        const fresh = await host.getFileDownloadUrl({ fileId: attachment.fileId });
-        const freshUrl = readFreshDownloadUrl(fresh);
-
-        if (freshUrl != null) {
-          downloadUrl = freshUrl;
-        }
-      } catch {
-        downloadUrl = attachment.downloadUrl;
-      }
-    }
-
-    if (downloadUrl == null || !isAllowedChatgptAttachmentDownloadUrl(downloadUrl)) {
-      return null;
-    }
-
-    const response = await fetch(downloadUrl);
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const bytes = await response.arrayBuffer();
-
-    return bytes.byteLength > 0 ? bytes : null;
+    return await downloadChatgptAttachment({
+      attachment,
+      getFileDownloadUrl: host?.getFileDownloadUrl?.bind(host),
+      fetchBytes: async (url) => {
+        const response = await fetch(url);
+        return response.ok ? await response.arrayBuffer() : null;
+      },
+    });
   }, []);
 
   const importAttachments = useCallback(
@@ -254,7 +243,7 @@ function UploadWidget(): ReactElement {
           }
 
           setPhase("error");
-          setErrorMessage("Couldn't download the attached photo. Choose it below.");
+          setErrorMessage("Couldn't download the ChatGPT attachment. Choose the file from your device.");
 
           return;
         }
@@ -266,7 +255,7 @@ function UploadWidget(): ReactElement {
         }
 
         setPhase("error");
-        setErrorMessage("Couldn't download the attached photo. Choose it below.");
+        setErrorMessage("Couldn't download the ChatGPT attachment. Choose the file from your device.");
       } finally {
         inFlightRef.current = false;
       }
@@ -306,7 +295,8 @@ function UploadWidget(): ReactElement {
 
   const onInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
-      const files = event.currentTarget.files;
+      const input = event.currentTarget;
+      const files = input.files;
 
       if (files == null || files.length === 0 || inFlightRef.current) {
         return;
@@ -323,7 +313,11 @@ function UploadWidget(): ReactElement {
         );
 
         await uploadByteGroups(groups);
-      })().finally(() => {
+      })().catch(() => {
+        setPhase("error");
+        setErrorMessage("Couldn't read that file. Choose it again.");
+      }).finally(() => {
+        input.value = "";
         inFlightRef.current = false;
       });
     },
@@ -398,7 +392,10 @@ function UploadWidget(): ReactElement {
         );
 
         await uploadByteGroups(groups);
-      })().finally(() => {
+      })().catch(() => {
+        setPhase("error");
+        setErrorMessage("Couldn't read that file. Choose it again.");
+      }).finally(() => {
         inFlightRef.current = false;
       });
     },
@@ -437,25 +434,9 @@ function UploadWidget(): ReactElement {
           transition: "border-color 120ms, background 120ms",
         }}
       >
-        {canSelectFiles ? (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={() => {
-              void onSelectFiles();
-            }}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              opacity: 0,
-              cursor: "pointer",
-            }}
-          />
-        ) : (
           <input
             type="file"
+            aria-label="Choose files from your device"
             multiple
             accept="image/*,video/*,audio/*,application/pdf"
             disabled={isBusy}
@@ -470,7 +451,6 @@ function UploadWidget(): ReactElement {
               fontSize: 16,
             }}
           />
-        )}
 
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
           {fileName ?? "Upload a file to VideoGen"}
@@ -484,6 +464,12 @@ function UploadWidget(): ReactElement {
               : PHASE_LABEL[phase]}
         </div>
       </label>
+
+      {canSelectFiles && <button type="button" disabled={isBusy} onClick={() => {
+        void onSelectFiles();
+      }} style={{ marginTop: 12, border: 0, background: "transparent", color: ACCENT, cursor: "pointer", font: "inherit" }}>
+        Choose from ChatGPT
+      </button>}
 
       {isBusy ? (
         <div
@@ -548,6 +534,8 @@ function UploadWidget(): ReactElement {
 }
 
 const container = document.getElementById("videogen-upload-root");
+
+initializeWidgetBridge("videogen-upload");
 
 if (container != null) {
   createRoot(container).render(

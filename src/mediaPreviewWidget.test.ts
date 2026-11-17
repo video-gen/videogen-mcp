@@ -84,9 +84,10 @@ void test("HOSTED server registers media preview resource without descriptor-lev
       cspMeta.data.ui.csp.resourceDomains.includes("https://storage-download.videogen.io"),
       "resourceDomains must allow the storage-download Worker host",
     );
-    assert.ok(
-      cspMeta.data["openai/widgetCSP"].redirect_domains.includes("https://app.videogen.io"),
-      "redirect_domains must allow opening the VideoGen Media app URL",
+    assert.deepEqual(
+      cspMeta.data["openai/widgetCSP"].redirect_domains,
+      ["https://app.videogen.io"],
+      "redirect_domains must allow only this environment's VideoGen app",
     );
     assert.equal(
       cspMeta.data["openai/widgetCSP"].redirect_domains.some((domain) =>

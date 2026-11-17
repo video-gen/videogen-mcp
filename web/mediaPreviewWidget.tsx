@@ -1,5 +1,6 @@
 import { StrictMode, useEffect, useRef, useState, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
+import { initializeWidgetBridge } from "./initializeWidgetBridge";
 import {
   buildPersistedMediaWidgetState,
   extractMediaItems,
@@ -54,7 +55,11 @@ function MediaPreviewWidget(): ReactElement {
       }
 
       try {
-        window.openai?.setWidgetState?.(buildPersistedMediaWidgetState(nextItems));
+        void Promise.resolve(
+          window.openai?.setWidgetState?.(buildPersistedMediaWidgetState(nextItems)),
+        ).catch(() => {
+          // Persistence is best-effort, including asynchronous host failures.
+        });
       } catch {
         // Persistence is best-effort.
       }
@@ -113,21 +118,22 @@ function MediaPreviewWidget(): ReactElement {
         return;
       }
 
-      const message = event.data;
+      const message: unknown = event.data;
       if (
         typeof message !== "object" ||
         message == null ||
-        (message as { jsonrpc?: unknown }).jsonrpc !== "2.0"
+        !("jsonrpc" in message) ||
+        message.jsonrpc !== "2.0"
       ) {
         return;
       }
 
-      if ((message as { method?: unknown }).method !== "ui/notifications/tool-result") {
+      if (!("method" in message) || message.method !== "ui/notifications/tool-result") {
         return;
       }
 
       const payload = readStructuredContent(message) ?? readStructuredContent(
-        (message as { params?: unknown }).params,
+        "params" in message ? message.params : undefined,
       );
       applyPayload(payload);
     };
@@ -182,7 +188,11 @@ function MediaPreviewWidget(): ReactElement {
         });
         setItems(hydrated);
         try {
-          window.openai?.setWidgetState?.(buildPersistedMediaWidgetState(hydrated));
+          void Promise.resolve(
+            window.openai?.setWidgetState?.(buildPersistedMediaWidgetState(hydrated)),
+          ).catch(() => {
+            // Persistence is best-effort, including asynchronous host failures.
+          });
         } catch {
           // best-effort
         }
@@ -337,6 +347,8 @@ function MediaPreviewWidget(): ReactElement {
 }
 
 const rootElement = document.getElementById("videogen-media-preview-root");
+
+initializeWidgetBridge("videogen-media-preview");
 
 if (rootElement != null) {
   createRoot(rootElement).render(

@@ -15,7 +15,7 @@ export function registerResourceTools(
     {
       title: "List text-to-speech voices",
       description:
-        "Return a page of narration voices with voiceId, display name, language, accent, description, deprecation status, and supportsDirectToolExecution. Use a voice with supportsDirectToolExecution true for text_to_speech; nextCursor fetches more voices.",
+        "Return a page of narration voices with voiceId, display name, language, accent, description, deprecation status, and supportsDirectToolExecution. All catalog voices support text_to_speech; nextCursor fetches more voices.",
       inputSchema: listTtsVoicesInputSchema,
       outputSchema: listTtsVoicesOutputSchema,
       annotations: READ_ONLY_TOOL_ANNOTATIONS,

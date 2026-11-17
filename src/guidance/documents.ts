@@ -51,11 +51,11 @@ const CREDITS_GUIDANCE_BLOCK_PATTERN =
 const UPLOAD_GUIDANCE_BLOCK_PATTERN =
   /<!-- mcp-host-upload-guidance -->[\s\S]*?<!-- \/mcp-host-upload-guidance -->/;
 
-const STANDARD_UPLOAD_GUIDANCE = `- **ChatGPT (hosted)**: call \`open_uploader\`. When the user already attached files in the chat, pass them in \`files\`. A filename is not the file and does not upload it.
+const STANDARD_UPLOAD_GUIDANCE = `- **ChatGPT (hosted)**: call \`open_uploader\`. Pass only attachments the user selected for the current VideoGen task in \`files\`; ask which files to use if unclear. A filename is not the file and does not upload it.
 - **Hosted remote**: \`upload_file\` with inline base64 for small files, or \`create_file_upload\` then \`PUT\` bytes to the returned URL, then \`get_file\` with \`wait: true\`.
 - **Local stdio**: \`upload_file\` with a local \`filePath\`.`;
 
-const CHATGPT_APP_UPLOAD_GUIDANCE = `- Call \`open_uploader\` to import a photo or file. When the user already attached files in the chat, pass each attachment in \`files\`. A filename is not the file and does not upload it.`;
+const CHATGPT_APP_UPLOAD_GUIDANCE = `- Call \`open_uploader\` to import a photo or file. For files the user selected for the current VideoGen task, pass each attachment in \`files\`. Ask which files to use if unclear. Omit \`files\` to open the picker. A filename is not the file and does not upload it.`;
 
 const AI_STYLE_EXAMPLES_BLOCK_PATTERN =
   /<!-- mcp-ai-style-examples -->[\s\S]*?<!-- \/mcp-ai-style-examples -->/;
@@ -81,7 +81,9 @@ export const applyHostSurfaceCreditsGuidance = ({
   hostSurface: McpHostSurface;
 }): string => {
   const replacement =
-    hostSurface === "CHATGPT_APP" ? CHATGPT_APP_CREDITS_GUIDANCE : STANDARD_MCP_CREDITS_GUIDANCE;
+    hostSurface === "CHATGPT_APP"
+      ? CHATGPT_APP_CREDITS_GUIDANCE
+      : STANDARD_MCP_CREDITS_GUIDANCE;
 
   if (!CREDITS_GUIDANCE_BLOCK_PATTERN.test(markdown)) {
     throw new Error(
@@ -101,7 +103,9 @@ export const applyHostSurfaceUploadGuidance = ({
   hostSurface: McpHostSurface;
 }): string => {
   const replacement =
-    hostSurface === "CHATGPT_APP" ? CHATGPT_APP_UPLOAD_GUIDANCE : STANDARD_UPLOAD_GUIDANCE;
+    hostSurface === "CHATGPT_APP"
+      ? CHATGPT_APP_UPLOAD_GUIDANCE
+      : STANDARD_UPLOAD_GUIDANCE;
 
   if (!UPLOAD_GUIDANCE_BLOCK_PATTERN.test(markdown)) {
     throw new Error(
@@ -138,7 +142,7 @@ const BASE_GUIDANCE_DOCUMENTS: readonly Omit<GuidanceDocument, "markdown">[] = [
     toolName: "get_workflows_guidance",
     title: "Workflows guidance",
     description:
-      "Canonical run → remix → export flow and when to use each workflow tool. Prefer script_to_video for longer narrated / informational videos; keep storyboard_to_video to ≤3 scenes unless the user asks for more. Call before starting a full video project.",
+      "Canonical run → edit → export flow and when to use each workflow tool. Prefer script_to_video for longer narrated / informational videos; keep storyboard_to_video to ≤3 scenes unless the user asks for more. Call before starting a full video project.",
   },
   {
     id: "tools-vs-workflows",
@@ -187,7 +191,13 @@ export const getGuidanceDocuments = ({
       return rawMarkdown;
     })();
 
-    return { ...doc, markdown };
+    return {
+      ...doc,
+      markdown:
+        doc.id === "getting-started" && hostSurface === "STANDARD"
+          ? `${markdown}\n\n${loadMarkdown("billing.md")}`
+          : markdown,
+    };
   });
 
 /** STANDARD-host documents (stdio / `/mcp`). Prefer getGuidanceDocuments for ChatGPT. */

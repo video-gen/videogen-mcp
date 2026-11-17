@@ -23,7 +23,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 /**
  * ChatGPT serves attachment bytes from its own CDN. The widget may fetch those
  * URLs in the browser. The MCP server must not: the URL is caller-supplied.
- * Keep this host check aligned with `UPLOAD_WIDGET_CSP.connectDomains`.
+ * Keep this host check aligned with `getUploadWidgetCsp().connectDomains`.
  */
 export function isAllowedChatgptAttachmentDownloadUrl(url: string): boolean {
   let parsed: URL;
@@ -105,6 +105,37 @@ export function readFreshDownloadUrl(value: unknown): string | null {
   }
 
   return downloadUrl;
+}
+
+/** Download the authorized attachment, refreshing only when its supplied URL fails. */
+export async function downloadChatgptAttachment({
+  attachment,
+  getFileDownloadUrl,
+  fetchBytes,
+}: {
+  attachment: ChatgptAttachment;
+  getFileDownloadUrl?: ((args: { fileId: string }) => Promise<unknown>) | undefined;
+  fetchBytes: (url: string) => Promise<ArrayBuffer | null>;
+}): Promise<ArrayBuffer | null> {
+  async function download(url: string | null): Promise<ArrayBuffer | null> {
+    if (url == null || !isAllowedChatgptAttachmentDownloadUrl(url)) return null;
+    try {
+      const bytes = await fetchBytes(url);
+      return bytes != null && bytes.byteLength > 0 ? bytes : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const supplied = await download(attachment.downloadUrl);
+  if (supplied != null) return supplied;
+  if (getFileDownloadUrl == null) return null;
+  try {
+    const fresh = readFreshDownloadUrl(await getFileDownloadUrl({ fileId: attachment.fileId }));
+    return await download(fresh);
+  } catch {
+    return null;
+  }
 }
 
 function readString(payload: unknown, key: string): string | null {

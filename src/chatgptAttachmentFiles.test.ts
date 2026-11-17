@@ -2,12 +2,58 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isAllowedChatgptAttachmentDownloadUrl,
+  downloadChatgptAttachment,
   readChatgptAttachments,
   readFreshDownloadUrl,
   uploadBytesToVideoGen,
 } from "./chatgptAttachmentFiles";
 
 const ALLOWED_URL = "https://files.oaiusercontent.com/attachment";
+
+const attachment = { fileId: "file_photo", downloadUrl: ALLOWED_URL, fileName: "photo.png", mimeType: "image/png" };
+
+void test("uses the supplied attachment URL without requiring the host's refresh helper", async () => {
+  const bytes = new Uint8Array([1, 2]).buffer;
+  let refreshed = false;
+  assert.equal(await downloadChatgptAttachment({ attachment, fetchBytes: (url) => {
+    assert.equal(url, ALLOWED_URL);
+    return Promise.resolve(bytes);
+  }, getFileDownloadUrl: () => {
+    refreshed = true;
+    return Promise.resolve({ downloadUrl: "https://files.oaiusercontent.com/unavailable" });
+  } }), bytes);
+  assert.equal(refreshed, false);
+});
+
+void test("refreshes an expired attachment URL after download failure", async () => {
+  const bytes = new Uint8Array([3, 4]).buffer;
+  const freshUrl = "https://files.oaiusercontent.com/fresh";
+  const urls: string[] = [];
+  assert.equal(await downloadChatgptAttachment({ attachment, fetchBytes: (url) => {
+    urls.push(url);
+    return Promise.resolve(url === freshUrl ? bytes : null);
+  }, getFileDownloadUrl: (args) => {
+    assert.deepEqual(args, { fileId: attachment.fileId });
+    return Promise.resolve({ downloadUrl: freshUrl });
+  } }), bytes);
+  assert.deepEqual(urls, [ALLOWED_URL, freshUrl]);
+});
+
+void test("handles a throwing download and never fetches an untrusted refreshed URL", async () => {
+  const urls: string[] = [];
+  assert.equal(await downloadChatgptAttachment({ attachment, fetchBytes: (url) => {
+    urls.push(url);
+    return Promise.reject(new TypeError("Network failure"));
+  }, getFileDownloadUrl: () => Promise.resolve({ downloadUrl: "https://attacker.example/file" }) }), null);
+  assert.deepEqual(urls, [ALLOWED_URL]);
+});
+
+void test("library downloads fail cleanly when ChatGPT cannot provide a usable URL", async () => {
+  assert.equal(await downloadChatgptAttachment({ attachment: { ...attachment, downloadUrl: null },
+    getFileDownloadUrl: () => Promise.reject(new TypeError("Unavailable")),
+    fetchBytes: () => assert.fail("There is no authorized URL to fetch"),
+  }), null);
+});
 
 void test("accepts ChatGPT attachment download hosts and rejects everything else", () => {
   assert.equal(isAllowedChatgptAttachmentDownloadUrl(ALLOWED_URL), true);

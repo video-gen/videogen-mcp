@@ -1,9 +1,9 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { isJSONRPCResponse } from "@modelcontextprotocol/sdk/types.js";
 import type { VideoGen } from "@videogen/sdk";
+import { buildAppDeepLinkUrl } from "./appDeepLink";
 import { applyServerProxyKeepAliveTimeouts } from "./applyServerProxyKeepAliveTimeouts";
 import { OAUTH_SCOPES, SERVER_NAME, SERVER_VERSION, buildMcpServer } from "./buildServer";
 import { createVideoGenClientFromToken } from "./client";
@@ -44,6 +44,7 @@ import {
   getClientIp,
 } from "./rateLimit";
 import { resolveMcpUpstreamClientId } from "./resolveMcpUpstreamClientId";
+import { sendMcpToolAnalytics } from "./toolAnalytics";
 import { mirrorSecuritySchemesToTopLevel } from "./securitySchemes";
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -380,6 +381,16 @@ async function handleMcpPost(
     // `/mcp/chatgpt` is the Plugins / ChatGPT Apps surface (no commerce deep
     // links). `/mcp` and every other path keep STANDARD upgrade/top-ups help.
     mcpPath === MCP_CHATGPT_PATH ? "CHATGPT_APP" : "STANDARD",
+    token != null && getVideogenEnvironment() !== "LOCAL"
+      ? async (event) => {
+          await sendMcpToolAnalytics({
+            baseUrl: config.baseUrl,
+            bearerToken: token,
+            clientName: upstreamClientId,
+            event,
+          });
+        }
+      : null,
   );
 
   // Stateless: a fresh server + transport per request, since each request may
@@ -429,14 +440,7 @@ async function handleMcpPost(
   req.on("close", cleanup);
 
   try {
-    // We intentionally use an unsafe `as` assertion here because the SDK's
-    // StreamableHTTPServerTransport getters (`onclose`/`onerror`/`onmessage`)
-    // are typed `X | undefined`, which fails to satisfy its own `Transport`
-    // interface (optional `X`) under this package's `exactOptionalPropertyTypes`.
-    // The class is the canonical transport for `server.connect`, and no
-    // restructuring (typed local, wrapper fn, rebuilt object) can change a
-    // getter's declared type.
-    await server.connect(transport as Transport);
+    await server.connect(transport);
     await transport.handleRequest(req, res, bodyResult.body);
     logMcpRequest({
       method: mcpMethod,
@@ -513,6 +517,24 @@ const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
   }
 
   if (pathname === "/" && method === "GET") {
+    res.setHeader("Vary", "Accept");
+    // Hosts may use the widget origin as the default Open in app target.
+    // Keep machine discovery intact while sending document navigations home.
+    if (
+      req.headers.accept
+        ?.split(",")
+        .some((type) => type.trim().split(";")[0] === "text/html")
+    ) {
+      res.writeHead(302, {
+        Location: buildAppDeepLinkUrl({
+          type: "NAVIGATE",
+          destination: "HOME",
+        }),
+        "Cache-Control": "no-store",
+      });
+      res.end();
+      return;
+    }
     writeJson(res, 200, {
       name: SERVER_NAME,
       version: SERVER_VERSION,

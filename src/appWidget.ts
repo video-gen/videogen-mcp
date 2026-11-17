@@ -4,18 +4,18 @@ import { fileURLToPath } from "node:url";
 import { buildAppDeepLinkUrl } from "./appDeepLink";
 
 /**
- * The stable MCP resource URI for the ChatGPT App upload widget. Compatible
- * widget updates may remain cached by the host for up to one hour.
+ * Versioned resource URI so hosts do not reuse the pre-handshake upload bundle.
  */
-export const UPLOAD_WIDGET_URI = "ui://widget/videogen-upload.html";
+export const UPLOAD_WIDGET_URI = "ui://widget/videogen-upload-v3.html";
 
 /**
  * Inline media preview for generation / export / file tool results (images,
- * videos, audio). Compatible updates may remain cached for up to one hour.
+ * videos, audio). v3 also registers the first-party Open in app target.
  */
-export const MEDIA_PREVIEW_WIDGET_URI = "ui://widget/videogen-media-preview.html";
+export const MEDIA_PREVIEW_WIDGET_URI =
+  "ui://widget/videogen-media-preview-v3.html";
 
-export const HOME_WIDGET_URI = "ui://widget/videogen-home.html";
+export const HOME_WIDGET_URI = "ui://widget/videogen-app-v4.html";
 
 /**
  * The MCP Apps UI MIME type. A host only wires up the MCP Apps bridge (so
@@ -84,33 +84,23 @@ const MEDIA_RESOURCE_DOMAINS = [
  * attachment bytes from `*.oaiusercontent.com`. The MCP server never fetches
  * those attachment URLs. MCP tool calls go through the host bridge.
  */
-export const UPLOAD_WIDGET_CSP = {
+export const getUploadWidgetCsp = (): WidgetCsp => ({
   connectDomains: [
     "https://*.r2.cloudflarestorage.com",
     "https://*.oaiusercontent.com",
     "https://oaiusercontent.com",
   ],
-  resourceDomains: [] as string[],
+  resourceDomains: [],
   /**
    * ChatGPT-only: allowlist for `window.openai.openExternal` (safe-link skip).
    * Not expressible on `_meta.ui.csp` — must live under `openai/widgetCSP`.
    */
-  redirectDomains: [...MEDIA_RESOURCE_DOMAINS],
-} as const;
+  redirectDomains: [...MEDIA_RESOURCE_DOMAINS, getVideogenAppOrigin()],
+});
 
-/** @deprecated Use UPLOAD_WIDGET_CSP. Kept as an alias for existing call sites. */
-export const WIDGET_CSP = UPLOAD_WIDGET_CSP;
-
-/**
- * App origins allowed for `openExternal` from the media-preview widget.
- * Open must deep-link to `/media?storageFileId=…` — never to signed R2 URLs.
- */
-const MEDIA_PREVIEW_REDIRECT_DOMAINS = [
-  "https://app.videogen.io",
-  "https://prerelease.app.videogen.io",
-  "https://dev.app.videogen.io",
-  "http://localhost:3000",
-] as const;
+/** The app origin for this server's environment, so other environments' apps are never allowlisted. */
+export const getVideogenAppOrigin = (): string =>
+  new URL(buildAppDeepLinkUrl({ type: "NAVIGATE", destination: "HOME" })).origin;
 
 /**
  * Media preview loads signed download / thumbnail / video URLs as img/video/audio
@@ -118,19 +108,21 @@ const MEDIA_PREVIEW_REDIRECT_DOMAINS = [
  * are GCS or Mux signed URLs; upload PUTs (and some assets) use R2.
  *
  * `redirectDomains` is only for `openExternal` — the Open button goes to the
- * VideoGen Media page, not signed storage URLs (hosts append query params and
- * break signatures). See `.cursor/rules/no-signed-storage-urls-in-external-widgets.mdc`.
+ * VideoGen Media page (`/media?storageFileId=…`), not signed storage URLs
+ * (hosts append query params and break signatures). See
+ * `.cursor/rules/no-signed-storage-urls-in-external-widgets.mdc`.
  */
-export const MEDIA_PREVIEW_WIDGET_CSP = {
-  connectDomains: [] as string[],
+export const getMediaPreviewWidgetCsp = (): WidgetCsp => ({
+  connectDomains: [],
   resourceDomains: [...MEDIA_RESOURCE_DOMAINS],
-  redirectDomains: [...MEDIA_PREVIEW_REDIRECT_DOMAINS],
-} as const;
+  redirectDomains: [getVideogenAppOrigin()],
+});
 
 type WidgetCsp = {
   connectDomains: readonly string[];
   resourceDomains: readonly string[];
   redirectDomains: readonly string[];
+  frameDomains?: readonly string[];
 };
 
 /**
@@ -155,6 +147,7 @@ export function buildWidgetResourceMeta({
     csp: {
       connectDomains: string[];
       resourceDomains: string[];
+      frameDomains?: string[];
     };
   };
   "openai/widgetDescription": string;
@@ -163,6 +156,7 @@ export function buildWidgetResourceMeta({
     connect_domains: string[];
     resource_domains: string[];
     redirect_domains: string[];
+    frame_domains?: string[];
   };
   "openai/widgetPrefersBorder": true;
 } {
@@ -177,6 +171,9 @@ export function buildWidgetResourceMeta({
       csp: {
         connectDomains,
         resourceDomains,
+        ...(csp.frameDomains == null
+          ? {}
+          : { frameDomains: [...csp.frameDomains] }),
       },
     },
     "openai/widgetDescription": widgetDescription,
@@ -185,6 +182,9 @@ export function buildWidgetResourceMeta({
       connect_domains: connectDomains,
       resource_domains: resourceDomains,
       redirect_domains: redirectDomains,
+      ...(csp.frameDomains == null
+        ? {}
+        : { frame_domains: [...csp.frameDomains] }),
     },
     "openai/widgetPrefersBorder": true,
   };
@@ -197,7 +197,11 @@ let cachedUploadHtml: string | null = null;
 let cachedMediaPreviewHtml: string | null = null;
 let cachedHomeHtml: string | null = null;
 
-const readWidgetBundle = ({ bundleFileName }: { bundleFileName: string }): string => {
+const readWidgetBundle = ({
+  bundleFileName,
+}: {
+  bundleFileName: string;
+}): string => {
   const bundlePath = join(
     dirname(fileURLToPath(import.meta.url)),
     "widget",
@@ -205,8 +209,17 @@ const readWidgetBundle = ({ bundleFileName }: { bundleFileName: string }): strin
   );
 
   // Source-based MCP tests/dev runs still consume the built browser bundle.
-  const sourceBuildPath = join(dirname(fileURLToPath(import.meta.url)), "..", "dist", "widget", bundleFileName);
-  return readFileSync(existsSync(bundlePath) ? bundlePath : sourceBuildPath, "utf8");
+  const sourceBuildPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "dist",
+    "widget",
+    bundleFileName,
+  );
+  return readFileSync(
+    existsSync(bundlePath) ? bundlePath : sourceBuildPath,
+    "utf8",
+  );
 };
 
 const buildWidgetHtml = ({
@@ -225,8 +238,8 @@ const buildWidgetHtml = ({
     '<meta charset="utf-8" />',
     '<meta name="viewport" content="width=device-width, initial-scale=1" />',
     "</head>",
-    "<body style=\"margin:0;background:transparent;\">",
-    `<div id="${rootId}"></div>`,
+    '<body style="margin:0;background:transparent;">',
+    `<div id="${rootId}" data-app-url="${getVideogenAppOrigin()}"></div>`,
     `<script>${bundle}</script>`,
     "</body>",
     "</html>",
@@ -271,10 +284,7 @@ export function getHomeWidgetHtml(): string {
   cachedHomeHtml ??= buildWidgetHtml({
     rootId: "videogen-home-root",
     bundleFileName: "homeWidget.global.js",
-  }).replace(
-    '<div id="videogen-home-root">',
-    `<div id="videogen-home-root" data-app-url="${new URL(buildAppDeepLinkUrl({ type: "NAVIGATE", destination: "HOME" })).origin}">`,
-  );
+  });
   return cachedHomeHtml;
 }
 

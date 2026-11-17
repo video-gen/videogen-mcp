@@ -170,6 +170,23 @@ void test("capability answers lead with workflow example prompts, not motion gra
   assert.match(toolsVsWorkflows.markdown, /Do not open with `generate_motion_graphic`/);
 });
 
+void test("assistant guidance delegates through existing chats while preserving approvals and API limits", () => {
+  for (const hostSurface of ["STANDARD", "CHATGPT_APP"] as const) {
+    const instructions = getServerInstructionsForHostSurface({ hostSurface });
+    assert.match(instructions, /send_assistant_message/);
+    const docs = getGuidanceDocuments({ hostSurface });
+    const gettingStarted = docs.find((doc) => doc.id === "getting-started");
+    const asyncTasks = docs.find((doc) => doc.id === "async-tasks");
+    assert.ok(gettingStarted != null && asyncTasks != null);
+    assert.match(gettingStarted.markdown, /rejects dashboard-created projects/);
+    assert.match(gettingStarted.markdown, /suggestion alone is not user approval/);
+    assert.match(gettingStarted.markdown, /uncertain write/);
+    assert.match(gettingStarted.markdown, /requiresApp: true/);
+    assert.match(asyncTasks.markdown, /assistant writes always return immediately/i);
+    assert.match(asyncTasks.markdown, /do not claim an in-flight assistant turn was cancelled/);
+  }
+});
+
 void test("ChatGPT upload guidance does not offer tools that cannot see attachments", () => {
   const [chatgpt] = getGuidanceDocuments({ hostSurface: "CHATGPT_APP" }).filter(
     (doc) => doc.id === "getting-started",

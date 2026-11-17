@@ -1,3 +1,4 @@
+import { ok } from "node:assert/strict";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
 /**
@@ -30,6 +31,8 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
  *     timeout (a single wait-to-terminal call would 524).
  */
 
+// Generation/account tools covered by this smoke. Billing is intentionally
+// tested by the dedicated sandbox suite and must never charge in this battery.
 // Every tool registered on the HOSTED (Streamable HTTP) server — see
 // registerTools + registerUploadWidget. tools/list must expose all of them.
 const ALL_HOSTED_TOOLS = [
@@ -45,6 +48,7 @@ const ALL_HOSTED_TOOLS = [
   "storyboard_to_video",
   "prompt_to_video_clip",
   "video_to_video",
+  "translate_video",
   "list_workflow_runs",
   "get_workflow_run",
   "cancel_workflow_run",
@@ -61,6 +65,7 @@ const ALL_HOSTED_TOOLS = [
   "remove_video_background",
   "upscale_image",
   "upscale_video",
+  "dub_video",
   "image_3d_effect",
   "list_tool_executions",
   "get_tool_execution",
@@ -70,8 +75,8 @@ const ALL_HOSTED_TOOLS = [
   "get_project",
   "export_project",
   "get_project_export",
-  "remix_project",
-  "list_project_remix_actions",
+  "start_video_edits",
+  "list_video_edits",
   // files
   "upload_file",
   "create_file_upload",
@@ -97,7 +102,10 @@ const ALL_HOSTED_TOOLS = [
 ];
 
 // Tools whose failure is logged but does not fail the suite. See the module doc.
-const BEST_EFFORT_TOOLS = new Set(["slideshow_to_video", "storyboard_to_video"]);
+const BEST_EFFORT_TOOLS = new Set([
+  "slideshow_to_video",
+  "storyboard_to_video",
+]);
 
 // Long-running awaited calls (generation/workflow/export) can take many minutes.
 // The hosted MCP sits behind Cloudflare's ~100s proxy read timeout, so each
@@ -116,11 +124,14 @@ type IdPrefix =
   | "vg_tool_"
   | "vg_work_"
   | "vg_proj_"
+  | "vg_vide_"
   | "vg_voic_"
   | "vg_enti_";
 
 const readProp = (value: unknown, key: string): unknown =>
-  value != null && typeof value === "object" ? Reflect.get(value, key) : undefined;
+  value != null && typeof value === "object"
+    ? Reflect.get(value, key)
+    : undefined;
 
 const readString = (value: unknown, key: string): string | undefined => {
   const prop = readProp(value, key);
@@ -129,7 +140,10 @@ const readString = (value: unknown, key: string): string | undefined => {
 
 // Depth-first search for the first string anywhere in a parsed-JSON tree that
 // satisfies `predicate`. Used to pull ids out of loosely-typed tool responses.
-function deepFindString(value: unknown, predicate: (candidate: string) => boolean): string | null {
+function deepFindString(
+  value: unknown,
+  predicate: (candidate: string) => boolean,
+): string | null {
   if (typeof value === "string") {
     return predicate(value) ? value : null;
   }
@@ -163,7 +177,10 @@ const findPrefixedId = (value: unknown, prefix: IdPrefix): string | null =>
 // A generated tool execution's terminal snapshot carries `results: [{ fileId, type }]`.
 // Return the first output file id (optionally matching a type) so it can feed a
 // downstream tool that needs a source asset.
-function findResultFileId(value: unknown, type?: "IMAGE" | "VIDEO" | "AUDIO"): string | null {
+function findResultFileId(
+  value: unknown,
+  type?: "IMAGE" | "VIDEO" | "AUDIO",
+): string | null {
   const results = readProp(value, "results");
 
   if (Array.isArray(results)) {
@@ -228,14 +245,20 @@ function assertTerminalSuccess(json: unknown, label: string): void {
     return;
   }
 
-  if (normalized === "failed" || normalized === "cancelled" || normalized === "canceled") {
+  if (
+    normalized === "failed" ||
+    normalized === "cancelled" ||
+    normalized === "canceled"
+  ) {
     const errorMessage = readString(readProp(json, "error"), "message");
     throw new Error(
       `${label} ended in status "${status}"${errorMessage != null ? `: ${errorMessage}` : ""}`,
     );
   }
 
-  throw new Error(`${label} did not reach a terminal state in time (status "${status}")`);
+  throw new Error(
+    `${label} did not reach a terminal state in time (status "${status}")`,
+  );
 }
 
 function getIsTerminalSnapshot(json: unknown): boolean {
@@ -317,10 +340,14 @@ export async function runFullCoverage({
   const missingTools = ALL_HOSTED_TOOLS.filter((name) => !toolNames.has(name));
 
   if (missingTools.length > 0) {
-    throw new Error(`tools/list is missing expected HOSTED tools: ${missingTools.join(", ")}`);
+    throw new Error(
+      `tools/list is missing expected HOSTED tools: ${missingTools.join(", ")}`,
+    );
   }
 
-  log(`[mcp-smoke] full coverage: ${ALL_HOSTED_TOOLS.length} tools advertised, exercising each...`);
+  log(
+    `[mcp-smoke] full coverage: ${ALL_HOSTED_TOOLS.length} tools advertised, exercising each...`,
+  );
 
   // Invokes a tool, throwing on an error result so a step can `await` it directly.
   // `longRunning` starts with wait:false then polls get_* with short HTTP requests
@@ -338,7 +365,10 @@ export async function runFullCoverage({
         { name: toolName, arguments: toolArgs },
         undefined,
         longRunning
-          ? { timeout: LONG_CALL_TIMEOUT_MS, maxTotalTimeout: LONG_CALL_TIMEOUT_MS }
+          ? {
+              timeout: LONG_CALL_TIMEOUT_MS,
+              maxTotalTimeout: LONG_CALL_TIMEOUT_MS,
+            }
           : {},
       );
       const text = extractResultText(result);
@@ -374,7 +404,9 @@ export async function runFullCoverage({
     const workflowRunId = readString(started, "workflowRunId");
     const exportId = readString(started, "exportId");
     const projectId =
-      typeof args.projectId === "string" ? args.projectId : readString(started, "projectId");
+      typeof args.projectId === "string"
+        ? args.projectId
+        : readString(started, "projectId");
 
     const deadline = Date.now() + LONG_POLL_TIMEOUT_MS;
     let snapshot: unknown = started;
@@ -416,7 +448,11 @@ export async function runFullCoverage({
     { sampleable = false }: { sampleable?: boolean } = {},
   ): Promise<void> => {
     if (sampleable && !getShouldRunSampledStep()) {
-      outcomes.push({ name, status: "skip", detail: "sampled out (TEST_SAMPLE_RATE_PERCENT)" });
+      outcomes.push({
+        name,
+        status: "skip",
+        detail: "sampled out (TEST_SAMPLE_RATE_PERCENT)",
+      });
       log(`  ⊘ ${name} (sampled out this run, non-fatal)`);
       return;
     }
@@ -452,6 +488,7 @@ export async function runFullCoverage({
     toolExecutionId?: string | undefined;
     workflowRunId?: string | undefined;
     projectId?: string | undefined;
+    editableVideoId?: string | undefined;
   } = {};
 
   // ---- guidance (noauth; no credits) ----
@@ -485,7 +522,9 @@ export async function runFullCoverage({
       typeof result.url !== "string" ||
       !result.url.includes("vg_action=OPEN_UPGRADE")
     ) {
-      throw new Error("get_app_deep_link should return an OPEN_UPGRADE app URL");
+      throw new Error(
+        "get_app_deep_link should return an OPEN_UPGRADE app URL",
+      );
     }
 
     return result.url;
@@ -498,7 +537,9 @@ export async function runFullCoverage({
   await step("list_tts_voices", async () => {
     const json = await call("list_tts_voices", { limit: 5 });
     ctx.voiceId = findPrefixedId(json, "vg_voic_") ?? undefined;
-    return ctx.voiceId != null ? `voiceId=${ctx.voiceId}` : "no voices returned";
+    return ctx.voiceId != null
+      ? `voiceId=${ctx.voiceId}`
+      : "no voices returned";
   });
 
   await step("list_files", async () => {
@@ -635,14 +676,21 @@ export async function runFullCoverage({
 
     const pdfBytes = buildMinimalPdf();
     // Pre-signed URL: PUT the raw bytes with NO Authorization header.
-    const putResponse = await fetch(uploadUrl, { method: "PUT", body: pdfBytes });
+    const putResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      body: pdfBytes,
+    });
 
     if (!putResponse.ok) {
       throw new Error(`PUT to pre-signed URL failed: ${putResponse.status}`);
     }
 
     // Wait until the uploaded PDF finishes processing so it can drive a workflow.
-    await call("get_file", { fileId, wait: true, timeoutMs: 120000 }, { longRunning: true });
+    await call(
+      "get_file",
+      { fileId, wait: true, timeoutMs: 120000 },
+      { longRunning: true },
+    );
     ctx.pdfFileId = fileId;
     return `pdfFileId=${fileId}`;
   });
@@ -651,11 +699,16 @@ export async function runFullCoverage({
   await step("generate_image", async () => {
     const json = await call(
       "generate_image",
-      { prompt: "A single red apple on a plain white background, product photo.", quality: "LOW" },
+      {
+        prompt:
+          "A single red apple on a plain white background, product photo.",
+        quality: "LOW",
+      },
       { longRunning: true },
     );
     assertTerminalSuccess(json, "generate_image");
-    ctx.toolExecutionId = findPrefixedId(json, "vg_tool_") ?? ctx.toolExecutionId;
+    ctx.toolExecutionId =
+      findPrefixedId(json, "vg_tool_") ?? ctx.toolExecutionId;
     const outputFileId = findResultFileId(json, "IMAGE");
     ctx.generatedImageFileId = outputFileId ?? undefined;
     return outputFileId != null ? `outputFileId=${outputFileId}` : "generated";
@@ -673,7 +726,9 @@ export async function runFullCoverage({
     );
     assertTerminalSuccess(json, "text_to_speech");
     ctx.audioFileId = findResultFileId(json, "AUDIO") ?? undefined;
-    return ctx.audioFileId != null ? `audioFileId=${ctx.audioFileId}` : "generated";
+    return ctx.audioFileId != null
+      ? `audioFileId=${ctx.audioFileId}`
+      : "generated";
   });
 
   await step(
@@ -707,7 +762,10 @@ export async function runFullCoverage({
     async () => {
       const json = await call(
         "generate_motion_graphic",
-        { prompt: "The word 'VideoGen' typing on in a clean sans-serif.", durationSeconds: 3 },
+        {
+          prompt: "The word 'VideoGen' typing on in a clean sans-serif.",
+          durationSeconds: 3,
+        },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "generate_motion_graphic");
@@ -718,12 +776,18 @@ export async function runFullCoverage({
   await step("generate_video_clip", async () => {
     const json = await call(
       "generate_video_clip",
-      { quality: "STANDARD", prompt: "A calm ocean wave rolling onto a sandy beach.", durationSeconds: 5 },
+      {
+        quality: "STANDARD",
+        prompt: "A calm ocean wave rolling onto a sandy beach.",
+        durationSeconds: 5,
+      },
       { longRunning: true },
     );
     assertTerminalSuccess(json, "generate_video_clip");
     ctx.videoFileId = findResultFileId(json, "VIDEO") ?? undefined;
-    return ctx.videoFileId != null ? `videoFileId=${ctx.videoFileId}` : "generated";
+    return ctx.videoFileId != null
+      ? `videoFileId=${ctx.videoFileId}`
+      : "generated";
   });
 
   await step(
@@ -909,12 +973,14 @@ export async function runFullCoverage({
     const json = await call(
       "script_to_video",
       {
-        script: "Welcome to VideoGen. This is a short automated smoke test of the script to video workflow.",
+        script:
+          "Welcome to VideoGen. This is a short automated smoke test of the script to video workflow.",
       },
       { longRunning: true },
     );
     assertTerminalSuccess(json, "script_to_video");
     ctx.projectId = findPrefixedId(json, "vg_proj_") ?? undefined;
+    ctx.editableVideoId = findPrefixedId(json, "vg_vide_") ?? undefined;
     ctx.workflowRunId = findPrefixedId(json, "vg_work_") ?? ctx.workflowRunId;
     return `projectId=${ctx.projectId ?? "none"} workflowRunId=${ctx.workflowRunId ?? "none"}`;
   });
@@ -941,7 +1007,11 @@ export async function runFullCoverage({
       throw new Error("no PDF file id from create_file_upload");
     }
 
-    const json = await call("slideshow_to_video", { fileId: ctx.pdfFileId }, { longRunning: true });
+    const json = await call(
+      "slideshow_to_video",
+      { fileId: ctx.pdfFileId },
+      { longRunning: true },
+    );
     assertTerminalSuccess(json, "slideshow_to_video");
   });
 
@@ -950,7 +1020,10 @@ export async function runFullCoverage({
     async () => {
       const json = await call(
         "prompt_to_video_clip",
-        { prompt: "A time-lapse of clouds moving over a mountain range.", durationSeconds: 5 },
+        {
+          prompt: "A time-lapse of clouds moving over a mountain range.",
+          durationSeconds: 5,
+        },
         { longRunning: true },
       );
       assertTerminalSuccess(json, "prompt_to_video_clip");
@@ -970,7 +1043,8 @@ export async function runFullCoverage({
   });
 
   await step("get_workflow_run", async () => {
-    const workflowRunId = ctx.workflowRunId ?? (await resolveAnyWorkflowRunId(call));
+    const workflowRunId =
+      ctx.workflowRunId ?? (await resolveAnyWorkflowRunId(call));
 
     if (workflowRunId == null) {
       throw new Error("no workflow run id available");
@@ -1009,26 +1083,31 @@ export async function runFullCoverage({
   });
 
   await step(
-    "remix_project",
+    "start_video_edits",
     async () => {
       if (ctx.projectId == null) {
         throw new Error("no project id available");
       }
 
-      await call("remix_project", {
+      ok(
+        ctx.editableVideoId != null,
+        "script workflow returned no editable video id",
+      );
+      await call("start_video_edits", {
         projectId: ctx.projectId,
-        edits: ["CAPTIONS", "TRANSITIONS"],
+        editableVideoId: ctx.editableVideoId,
+        videoEdits: [{ type: "ENABLE_CAPTIONS" }, { type: "ADD_TRANSITIONS" }],
       });
     },
     { sampleable: true },
   );
 
-  await step("list_project_remix_actions", async () => {
+  await step("list_video_edits", async () => {
     if (ctx.projectId == null) {
       throw new Error("no project id available");
     }
 
-    await call("list_project_remix_actions", { projectId: ctx.projectId });
+    await call("list_video_edits", { projectId: ctx.projectId });
   });
 
   await step(
@@ -1096,7 +1175,8 @@ async function resolveAnyProjectId(
 // dependency-free (ASCII only, so char length == byte length for the offsets).
 function buildMinimalPdf(): Uint8Array {
   const header = "%PDF-1.4\n";
-  const streamContent = "BT /F1 24 Tf 72 700 Td (VideoGen MCP smoke slide) Tj ET";
+  const streamContent =
+    "BT /F1 24 Tf 72 700 Td (VideoGen MCP smoke slide) Tj ET";
   const objects = [
     "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
     "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",

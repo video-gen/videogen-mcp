@@ -1,4 +1,5 @@
 import type {
+  DubVideoRequest,
   ExportProjectRequest,
   GenerateAvatarRequest,
   GenerateImageRequest,
@@ -11,14 +12,17 @@ import type {
   RemixProjectRequest,
   ScriptToVideoRequest,
   SlideshowToVideoRequest,
+  StartVideoEditsRequest,
   StoryboardToVideoRequest,
   TextToSpeechRequest,
+  TranslateVideoRequest,
   VideoAssetRequest,
   VideoToVideoRequest,
   VoiceoverToVideoRequest,
 } from "@videogen/sdk";
 import type { z } from "zod";
 import {
+  dubVideoInputSchema,
   exportProjectInputSchema,
   generateAvatarInputSchema,
   generateImageInputSchema,
@@ -33,8 +37,10 @@ import {
   removeVideoBackgroundInputSchema,
   scriptToVideoInputSchema,
   slideshowToVideoInputSchema,
+  startVideoEditsInputSchema,
   storyboardToVideoInputSchema,
   textToSpeechInputSchema,
+  translateVideoInputSchema,
   upscaleImageInputSchema,
   upscaleVideoInputSchema,
   vectorizeImageInputSchema,
@@ -85,6 +91,8 @@ type RemixProjectMcpSdkView = Omit<RemixProjectRequest, "remixActions"> & {
   edits: RemixEdit[];
 };
 
+type StartVideoEditsMcpSdkView = StartVideoEditsRequest & { projectId: string };
+
 assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof scriptToVideoInputSchema>, ScriptToVideoMcpSdkView>
 >(true);
@@ -108,6 +116,9 @@ assertTrue<
 >(true);
 assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof videoToVideoInputSchema>, VideoToVideoRequest>
+>(true);
+assertTrue<
+  AssertMcpKeysSubsetOfSdk<z.output<typeof translateVideoInputSchema>, TranslateVideoRequest>
 >(true);
 assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof generateImageInputSchema>, GenerateImageRequest>
@@ -155,10 +166,19 @@ assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof image3dEffectInputSchema>, ImageAssetRequest>
 >(true);
 assertTrue<
+  AssertMcpKeysSubsetOfSdk<z.output<typeof dubVideoInputSchema>, DubVideoRequest>
+>(true);
+assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof exportProjectInputSchema>, ExportProjectMcpSdkView>
 >(true);
 assertTrue<
   AssertMcpKeysSubsetOfSdk<z.output<typeof remixProjectInputSchema>, RemixProjectMcpSdkView>
+>(true);
+assertTrue<
+  AssertMcpKeysSubsetOfSdk<
+    z.output<typeof startVideoEditsInputSchema>,
+    StartVideoEditsMcpSdkView
+  >
 >(true);
 
 export type CreativeToolOpenApiContract = {
@@ -212,6 +232,12 @@ export const CREATIVE_TOOL_OPENAPI_CONTRACTS: readonly CreativeToolOpenApiContra
   {
     toolName: "video_to_video",
     openApiSchemaName: "VideoToVideoRequest",
+    fieldAliases: {},
+    mcpOnlyFields: [],
+  },
+  {
+    toolName: "translate_video",
+    openApiSchemaName: "TranslateVideoRequest",
     fieldAliases: {},
     mcpOnlyFields: [],
   },
@@ -298,15 +324,21 @@ export const CREATIVE_TOOL_OPENAPI_CONTRACTS: readonly CreativeToolOpenApiContra
     mcpOnlyFields: [],
   },
   {
+    toolName: "dub_video",
+    openApiSchemaName: "DubVideoRequest",
+    fieldAliases: {},
+    mcpOnlyFields: [],
+  },
+  {
     toolName: "export_project",
     openApiSchemaName: "ExportProjectRequest",
     fieldAliases: {},
     mcpOnlyFields: ["projectId"],
   },
   {
-    toolName: "remix_project",
-    openApiSchemaName: "RemixProjectRequest",
-    fieldAliases: { edits: "remixActions" },
+    toolName: "start_video_edits",
+    openApiSchemaName: "StartVideoEditsRequest",
+    fieldAliases: {},
     mcpOnlyFields: ["projectId"],
   },
 ];

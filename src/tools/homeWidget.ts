@@ -2,27 +2,26 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   HOME_WIDGET_URI,
-  MEDIA_PREVIEW_WIDGET_CSP,
   WIDGET_MIME_TYPE,
   buildWidgetResourceMeta,
   getHomeWidgetHtml,
+  getVideogenAppOrigin,
 } from "../appWidget";
 import { buildAppDeepLinkUrl } from "../appDeepLink";
 import { READ_ONLY_TOOL_ANNOTATIONS } from "../toolAnnotations";
 
 export function registerHomeWidget(server: McpServer): void {
-  const meta = buildWidgetResourceMeta({
+  const appOrigin = getVideogenAppOrigin();
+  const meta = { ...buildWidgetResourceMeta({
     csp: {
-      ...MEDIA_PREVIEW_WIDGET_CSP,
-      resourceDomains: [
-        ...MEDIA_PREVIEW_WIDGET_CSP.resourceDomains,
-        "https://static-assets.videogen.io",
-        "https://videogen.io",
-      ],
+      connectDomains: [],
+      resourceDomains: [],
+      redirectDomains: [appOrigin],
+      frameDomains: [appOrigin],
     },
     widgetDescription:
-      "VideoGen home: describe what you want to create, browse recent projects, examples, workflows, and reusable assets.",
-  });
+      "VideoGen’s complete existing app, including its own navigation, assistants, examples, media library and video editor. The ChatGPT connection adds selected-project context.",
+  }), "openai/ui": { availableDisplayModes: ["fullscreen"] } };
   server.registerResource(
     "videogen-home",
     HOME_WIDGET_URI,
@@ -47,7 +46,7 @@ export function registerHomeWidget(server: McpServer): void {
     {
       title: "VideoGen",
       description:
-        "Open VideoGen home to describe an idea, browse examples and featured workflows, and return to recent projects. Opening home does not generate media or spend credits.",
+        "Open the complete VideoGen app inside ChatGPT. Use its existing navigation, assistants, editable examples, media library and editor. Opening the app does not generate media or spend credits.",
       inputSchema: {},
       outputSchema: { appUrl: z.string().url() },
       annotations: READ_ONLY_TOOL_ANNOTATIONS,
@@ -64,7 +63,7 @@ export function registerHomeWidget(server: McpServer): void {
       content: [
         {
           type: "text",
-          text: "VideoGen home is ready. Describe what you want to create or browse the starting points.",
+          text: "VideoGen is open inside ChatGPT with its existing app interface and actions. Opening the app does not start generation.",
         },
       ],
       structuredContent: {

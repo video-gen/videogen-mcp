@@ -1,165 +1,99 @@
-/** MCP Apps bridge, using the same wire protocol as OpenAI's UI quickstart. */
-export function createHomeBridge() {
-  const surface = window;
-  let nextId = 0;
-  const pending = new Map<
-    number,
-    {
-      resolve: (value: unknown) => void;
-      timer: ReturnType<typeof setTimeout>;
-    }
-  >();
+import { registerOpenInAppTarget } from "./registerOpenInAppTarget";
 
+/** Only the expected app frame can publish a project selection. No tool/auth proxy. */
+export function createHomeBridge({ appOrigin, getAppWindow }: {
+  appOrigin: string;
+  getAppWindow: () => Window | null;
+}) {
+  const surface = window;
+  const disposeOpenInAppTarget = registerOpenInAppTarget(appOrigin);
+  const requestId = "videogen-embedded-app-init";
+  let ready = false;
+  let hasContext = false;
+  let projectId: string | null = null;
+  let nextId = 0;
+  let externalRequest: { hostId: string; requestId: string; appWindow: Window; timeout: ReturnType<typeof setTimeout> } | null = null;
+  const finishExternal = (opened: boolean): void => {
+    const pending = externalRequest;
+    if (pending == null) return;
+    externalRequest = null;
+    clearTimeout(pending.timeout);
+    pending.appWindow.postMessage({ type: "videogen:google-signin-opened", requestId: pending.requestId, opened }, appOrigin);
+  };
+  const publishContext = (): void => {
+    if (!ready || !hasContext) return;
+    surface.parent.postMessage({
+      jsonrpc: "2.0", id: `videogen-context-${++nextId}`, method: "ui/update-model-context",
+      params: { structuredContent: { videogen: { projectId } } },
+    }, "*");
+  };
+  const requestContext = (): void => getAppWindow()?.postMessage({ type: "videogen:request-context" }, appOrigin);
   const receive = (event: MessageEvent<unknown>): void => {
-    if (event.source !== surface.parent) return;
     const message = event.data;
-    if (
-      typeof message !== "object" ||
-      message == null ||
-      !("jsonrpc" in message) ||
-      message.jsonrpc !== "2.0" ||
-      !("id" in message) ||
-      typeof message.id !== "number"
-    )
+    if (message == null || typeof message !== "object") return;
+    const appWindow = getAppWindow();
+    if (appWindow != null && event.source === appWindow && event.origin === appOrigin && "type" in message && message.type === "videogen:context-ready") {
+      requestContext();
       return;
-    const request = pending.get(message.id);
-    if (request == null) return;
-    clearTimeout(request.timer);
-    pending.delete(message.id);
-    request.resolve(
-      "error" in message ? null : "result" in message ? message.result : null,
-    );
+    }
+    if (appWindow != null && event.source === appWindow && event.origin === appOrigin && "type" in message && message.type === "videogen:cancel-google-signin-open") {
+      if (externalRequest != null && "requestId" in message && message.requestId === externalRequest.requestId) finishExternal(false);
+      return;
+    }
+    if (appWindow != null && event.source === appWindow && event.origin === appOrigin && "type" in message && message.type === "videogen:open-google-signin") {
+      if (!("requestId" in message) || typeof message.requestId !== "string" || !/^[0-9a-f-]{36}$/i.test(message.requestId)) return;
+      const deny = (): void => appWindow.postMessage({ type: "videogen:google-signin-opened", requestId: message.requestId, opened: false }, appOrigin);
+      if (!ready || externalRequest != null || !("href" in message) || typeof message.href !== "string" || message.href.length > 16_384) { deny(); return; }
+      try {
+        const target = new URL(message.href);
+        if (target.origin !== appOrigin || target.username !== "" || target.password !== "" || target.pathname !== "/chatgpt/google-start" || !target.hash.startsWith("#authorize=")) { deny(); return; }
+        const hostId = `videogen-google-open-${++nextId}`;
+        externalRequest = { hostId, requestId: message.requestId, appWindow, timeout: setTimeout(() => finishExternal(false), 12_000) };
+        surface.parent.postMessage({ jsonrpc: "2.0", id: hostId, method: "ui/open-link", params: { url: target.href } }, "*");
+      } catch {
+        if (externalRequest?.requestId === message.requestId) finishExternal(false);
+        else deny();
+      }
+      return;
+    }
+    if (appWindow != null && event.source === appWindow && event.origin === appOrigin && "type" in message && message.type === "videogen:project-context" && "projectId" in message) {
+      const id = message.projectId ?? null;
+      if (id != null && (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) return;
+      if (hasContext && projectId === id) return;
+      hasContext = true;
+      projectId = id;
+      publishContext();
+      return;
+    }
+    if (event.source !== surface.parent || !("jsonrpc" in message) || message.jsonrpc !== "2.0") return;
+    if (externalRequest != null && "id" in message && message.id === externalRequest.hostId) {
+      if ("error" in message) finishExternal(false);
+      else if ("result" in message) {
+        const result = message.result;
+        finishExternal(result != null && typeof result === "object" && !("isError" in result && result.isError === true));
+      }
+      return;
+    }
+    if (ready || !("id" in message) || message.id !== requestId || !("result" in message) || "error" in message) return;
+    ready = true;
+    surface.parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} }, "*");
+    // Otherwise ChatGPT opens widgetDomain, which is the MCP server's JSON root.
+    surface.openai?.setOpenInAppUrl?.({ href: appOrigin });
+    publishContext();
+    requestContext();
   };
   surface.addEventListener("message", receive);
-
-  const request = (
-    method: string,
-    params: Record<string, unknown>,
-  ): Promise<unknown> =>
-    new Promise((resolve) => {
-      const id = ++nextId;
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        resolve(null);
-      }, 30_000);
-      pending.set(id, { resolve, timer });
-      surface.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
-    });
-
-  const ready = request("ui/initialize", {
-    appInfo: { name: "videogen-home", version: "1.0.0" },
-    appCapabilities: {},
-    protocolVersion: "2026-01-26",
-  }).then((result) => {
-    if (result == null) return false;
-    surface.parent.postMessage(
-      {
-        jsonrpc: "2.0",
-        method: "ui/notifications/initialized",
-        params: {},
-      },
-      "*",
-    );
-    return true;
-  });
-
-  return {
-    async callTool(
-      name: string,
-      args: Record<string, unknown>,
-    ): Promise<unknown> {
-      if (!(await ready)) return null;
-      return request("tools/call", { name, arguments: args });
+  surface.parent.postMessage({
+    jsonrpc: "2.0", id: requestId, method: "ui/initialize",
+    params: {
+      appInfo: { name: "videogen-embedded-app", version: "2.5.4" },
+      appCapabilities: { availableDisplayModes: ["fullscreen"] },
+      protocolVersion: "2026-01-26",
     },
-    async sendMessage(prompt: string): Promise<boolean> {
-      if (!(await ready)) return false;
-      const result = await request("ui/message", {
-        role: "user",
-        content: [{ type: "text", text: prompt }],
-      });
-      return (
-        typeof result === "object" &&
-        result != null &&
-        (!("isError" in result) || result.isError !== true)
-      );
-    },
-    dispose(): void {
-      surface.removeEventListener("message", receive);
-      for (const { resolve, timer } of pending.values()) {
-        clearTimeout(timer);
-        resolve(null);
-      }
-      pending.clear();
-    },
-  };
-}
-
-type HomeProject = {
-  projectId: string;
-  title: string;
-  projectUrl: string;
-};
-
-/** Validate untrusted host responses without shipping Zod in the browser. */
-export function readHomeProjects(result: unknown): HomeProject[] | null {
-  if (typeof result !== "object" || result == null) return null;
-  if ("isError" in result && result.isError === true) return null;
-  let payload: unknown =
-    "structuredContent" in result ? result.structuredContent : null;
-  if (payload == null && "content" in result && Array.isArray(result.content)) {
-    const content: unknown[] = result.content;
-    for (const item of content) {
-      if (
-        typeof item !== "object" ||
-        item == null ||
-        !("text" in item) ||
-        typeof item.text !== "string"
-      )
-        continue;
-      try {
-        payload = JSON.parse(item.text);
-      } catch {
-        return null;
-      }
-      break;
-    }
-  }
-  if (
-    typeof payload !== "object" ||
-    payload == null ||
-    !("projects" in payload) ||
-    !Array.isArray(payload.projects)
-  )
-    return null;
-  const projects: HomeProject[] = [];
-  const rows: unknown[] = payload.projects;
-  for (const project of rows) {
-    if (
-      typeof project !== "object" ||
-      project == null ||
-      !("projectId" in project) ||
-      typeof project.projectId !== "string" ||
-      !("title" in project) ||
-      typeof project.title !== "string" ||
-      !("projectUrl" in project) ||
-      typeof project.projectUrl !== "string"
-    )
-      return null;
-    projects.push({
-      projectId: project.projectId,
-      title: project.title,
-      projectUrl: project.projectUrl,
-    });
-  }
-  return projects;
-}
-
-export function getSafeHomeLink(href: string, appUrl: string): string | null {
-  try {
-    const url = new URL(href, appUrl);
-    if (url.origin !== new URL(appUrl).origin) return null;
-    return url.href;
-  } catch {
-    return null;
-  }
+  }, "*");
+  return { requestContext, dispose(): void {
+    disposeOpenInAppTarget();
+    finishExternal(false);
+    surface.removeEventListener("message", receive);
+  } };
 }

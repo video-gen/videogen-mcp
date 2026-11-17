@@ -10,11 +10,13 @@ Workflows, standalone media tools, and project exports are asynchronous. Start t
 
 ### Step 1 — Start the operation
 
-| Work | Start tool | Id to keep |
-| --- | --- | --- |
-| End-to-end video | `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video` | `workflowRunId` (and `projectId` when present) |
-| Single media asset | `generate_image`, `generate_video_clip`, `text_to_speech`, … | `toolExecutionId` |
-| MP4 render | `export_project` | `exportId` (+ `projectId`) |
+| Work                    | Start tool                                                                                                                                        | Id to keep                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| End-to-end video        | `script_to_video`, `voiceover_to_video`, `slideshow_to_video`, `storyboard_to_video`, `prompt_to_video_clip`, `video_to_video`, `translate_video` | `workflowRunId` (and `projectId` when present)         |
+| Single media asset      | `generate_image`, `generate_video_clip`, `text_to_speech`, …                                                                                      | `toolExecutionId`                                      |
+| External video import   | `import_video_from_url`                                                                                                                           | `fileImportId`                                         |
+| MP4 render              | `export_project`                                                                                                                                  | `exportId` (+ `projectId`)                             |
+| VideoGen assistant turn | `start_assistant_chat`, `send_assistant_message`, `act_on_assistant_action`                                                                       | `messageId` (+ existing `assistantId` and `projectId`) |
 
 ### Step 2 — Know the status set
 
@@ -26,13 +28,13 @@ Shared statuses: `pending`, `running`, `succeeded`, `failed`, `cancelled`.
 
 Tell the user a realistic wait **before or as you start**. Do not imply the result will appear in a few seconds. A healthy `pending` / `running` job is expected, not a stall.
 
-| Work | Typical wall time |
-| --- | --- |
-| `generate_image` and other still-image tools | about 15–60 seconds |
-| `generate_video_clip` | about 1–3 minutes (HIGH/MAX can be longer) |
-| `generate_motion_graphic` | about 2–5 minutes (writes animation code, then renders; complex prompts can take longer) |
-| `generate_avatar`, `generate_music` | often a few minutes |
-| Full workflows (`script_to_video`, …) with default auto-export | several minutes for the video, then more for the MP4 |
+| Work                                                           | Typical wall time                                                                        |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `generate_image` and other still-image tools                   | about 15–60 seconds                                                                      |
+| `generate_video_clip`                                          | about 1–3 minutes (HIGH/MAX can be longer)                                               |
+| `generate_motion_graphic`                                      | about 2–5 minutes (writes animation code, then renders; complex prompts can take longer) |
+| `generate_avatar`, `generate_music`                            | often a few minutes                                                                      |
+| Full workflows (`script_to_video`, …) with default auto-export | several minutes for the video, then more for the MP4                                     |
 
 Keep polling calmly. Quote `progressPercentage` when present. Do not start a second generation just because the first one is still running.
 
@@ -45,12 +47,14 @@ Composite start tools may poll internally for a while.
 
 When the snapshot is non-terminal, continue with the matching get tool:
 
-| Work | Continue polling with |
-| --- | --- |
-| Workflow | `get_workflow_run` (`workflowRunId`) |
-| Media tool | `get_tool_execution` (`toolExecutionId`) |
-| Export | `get_project_export` (`projectId`, `exportId`) |
-| Remix actions | `list_project_remix_actions` (`projectId`) |
+| Work                  | Continue polling with                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Workflow              | `get_workflow_run` (`workflowRunId`)                                                                       |
+| Media tool            | `get_tool_execution` (`toolExecutionId`)                                                                   |
+| Export                | `get_project_export` (`projectId`, `exportId`)                                                             |
+| External video import | `get_video_url_import` (`fileImportId`); a `selection` asks for a user choice before a new selected import |
+| Video edits           | `list_video_edits` (`projectId`)                                                                           |
+| Assistant reply       | `get_assistant_message` (`messageId`); assistant writes always return immediately on both transports       |
 
 Tell the user progress from `progressPercentage` when present. Retry get tools every few seconds until terminal (or until the user cancels).
 
@@ -61,6 +65,8 @@ Tell the user progress from `progressPercentage` when present. Retry get tools e
 
 Cancellation is best-effort; confirm with a final get/list call.
 
+Assistant tools do not expose cancellation. Stop sending further messages or approvals when asked to stop; do not claim an in-flight assistant turn was cancelled. A terminal assistant reply is not proof of finished project work: inspect actions and the updated project, and poll any linked `generation.workflowRunId` separately.
+
 ---
 
 ## Workflow runs
@@ -68,7 +74,7 @@ Cancellation is best-effort; confirm with a final get/list call.
 After a workflow start succeeds, store:
 
 - **`workflowRunId`**: poll with `get_workflow_run`.
-- **`projectId`**: required for `remix_project`, `export_project`, and other project tools. Prefer this over `projectUrl` for API/MCP automation.
+- **`projectId`**: required for `start_video_edits`, `export_project`, and other project tools. Prefer this over `projectUrl` for API/MCP automation.
 - **`projectUrl`**: deep link for a human to open the editor. Safe to share while a run is still processing.
 
 Treat those three values as one run-specific tuple. Every workflow start call
@@ -102,11 +108,15 @@ On success, results usually include file ids and download/thumbnail URLs for the
 
 Do not treat a missing `downloadUrl` while status is `running` as an error.
 
+### Display completed media in ChatGPT
+
+When `show_media_preview` is available, call it with the completed VideoGen file IDs after generation or export succeeds. It fetches fresh authorized file URLs and renders the actual media in the conversation. Use IDs returned by the operation, or locate existing outputs through `list_files`; do not substitute an illustration for a generated result. Keep `get_tool_execution`, `get_workflow_run`, and `get_project_export` for status polling. The render step does not start or repeat generation.
+
 ---
 
-## Remix actions
+## Video edits
 
-`remix_project` returns remix action ids. Each action has its own status. Poll `list_project_remix_actions` until every relevant action is terminal before exporting, if the user wants those edits in the MP4.
+`start_video_edits` returns video edit ids. Each action has its own status. Poll `list_video_edits` until every relevant action is terminal before exporting, if the user wants those edits in the MP4.
 
 ---
 
@@ -114,14 +124,14 @@ Do not treat a missing `downloadUrl` while status is `running` as an error.
 
 This MCP server does **not** register webhook endpoints. For production backends that should not hold a poll loop, use the REST API webhook subscription (`workflow_run.*`, tool execution events, etc.). See [https://docs.videogen.io/handling-async-tasks/webhooks](https://docs.videogen.io/handling-async-tasks/webhooks).
 
-Inside MCP chats, prefer polling with the get_* tools above.
+Inside MCP chats, prefer polling with the get\_\* tools above.
 
 ---
 
 ## Common mistakes
 
 1. **Treating a hosted mid-run snapshot as failure.** Continue with `get_*`.
-2. **Exporting before the workflow (or remix) is `succeeded`.** Wait for terminal success first.
+2. **Exporting before the workflow (or edit) is `succeeded`.** Wait for terminal success first.
 3. **Using `projectUrl` instead of `projectId` for follow-up tools.** Always pass `projectId`.
 4. **Reusing a failed attempt's project link after retrying.** Every retry creates a new project; replace the entire workflow/project tuple and share only the succeeded attempt's `projectUrl`.
 5. **Starting a second long workflow without checking credit/auth errors** from the first. Surface failures clearly; do not silently retry forever.
